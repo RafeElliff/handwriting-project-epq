@@ -6,6 +6,7 @@ import numpy
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
 images_pulled =r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_pulled"
 images_binarised_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_npy"
+images_binarised_jpg = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_jpg"
 def copy_new_scans():
     for file_name in os.listdir(onedrive_source): #loops through name of every file
         if file_name[-4:] == ".pdf":
@@ -23,10 +24,12 @@ def binarise_scans():
         if file_name not in os.listdir(images_binarised_npy):
             colour_image = os.path.join(images_pulled, file_name)
             grayscale_image = cv2.imread(colour_image, 2) #reads the image as a grayscale
-            _, black_and_white_image = cv2.threshold(grayscale_image, 80, 255, cv2.THRESH_BINARY) # stores the numpy datain black_and_white image
+            _, black_and_white_image = cv2.threshold(grayscale_image, 127, 255, cv2.THRESH_BINARY) # stores the numpy datain black_and_white image
+            black_and_white_image = cv2.bitwise_not(black_and_white_image) #the segmentation function used looks for white characters on a black background so it must be inverted
             dest_file = os.path.join(images_binarised_npy, file_name[:-4])
             numpy.save(dest_file, black_and_white_image) # stores numpy data in a .npy file in the images_binarised_npy folder
-
+            dest_file_jpg = os.path.join(images_binarised_jpg, file_name[:-4]+".jpg")
+            cv2.imwrite(dest_file_jpg, black_and_white_image)
 
 copy_new_scans()
 binarise_scans()
