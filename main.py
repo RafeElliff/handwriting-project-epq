@@ -1,0 +1,2 @@
+import prepare_scans
+prepare_scans.copy_new_scans()
