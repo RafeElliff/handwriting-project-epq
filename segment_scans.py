@@ -36,7 +36,7 @@ def connected_components_analysis(picture_name):
 
 # i = 0
 # for component in connected_components_analysis("Scan - 2025-12-28 16_02_44.npy"):
-#     print(i, component.area, component.width, component.height, component.centroid)
+#     print(i, component.height/component.width)
 #     i = i + 1
 # print("components:", i)
 
@@ -86,7 +86,25 @@ def look_through_npys():
         cv2.destroyAllWindows()
 
 
-# look_through_npys()
+look_through_npys()
 
 
+def show_components(image, components, scale=5):
+    for i, c in enumerate(components):
+        letter = image[c.y:c.y + c.height, c.x:c.x + c.width]
 
+        # Enlarge for display
+        letter_big = cv2.resize(
+            letter,
+            None,
+            fx=scale,
+            fy=scale,
+            interpolation=cv2.INTER_NEAREST
+        )
+
+        cv2.imshow(f"Component {i}", letter_big)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+# image = numpy.load(os.path.join(images_binarised_npy, "Scan - 2025-12-28 16_02_44.npy"))
+# show_components(image, join_2_part_letters(connected_components_analysis("Scan - 2025-12-28 16_02_44.npy")))
