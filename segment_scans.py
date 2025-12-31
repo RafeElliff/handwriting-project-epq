@@ -3,6 +3,7 @@ import cv2
 import numpy
 
 images_binarised_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_npy"
+images_binarised_jpg = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_jpg"
 list_of_split_px = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\list_of_split_px"
 
 
@@ -20,7 +21,8 @@ class Component:
 
 def get_all_components(picture_name):
     image = numpy.load(os.path.join(images_binarised_npy, picture_name))  #loads the .npy file)
-    num_of_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image, connectivity=8)  # connectivity refers to whether pixels diagonally adjacent are considered connected. On setting 8, they are.
+    num_of_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image,
+                                                                               connectivity=8)  # connectivity refers to whether pixels diagonally adjacent are considered connected. On setting 8, they are.
 
     list_file_name = picture_name[:-4] + "split_letter_px.npy"
     split_letter_npy = numpy.load(os.path.join(list_of_split_px, list_file_name))
@@ -47,7 +49,8 @@ def get_all_components(picture_name):
             split_letter = True
         else:
             split_letter = False
-        if (3 < width < 70 and 5 < height < 70 and min_size < area < max_size) or split_letter is True: #in order for it to be considered, it must meet these criteria. Otherwise, it is likely just noise or a leftover from the line removing algorithm.
+        if (
+                3 < width < 70 and 5 < height < 70 and min_size < area < max_size) or split_letter is True:  #in order for it to be considered, it must meet these criteria. Otherwise, it is likely just noise or a leftover from the line removing algorithm.
             components_list.append(Component(x, y, width, height, area, centroid, id, split_letter))
     return components_list
 
@@ -68,7 +71,8 @@ def join_2_part_letters(components):  # this function joins the tittles in i and
         elif component.area < 60:
             potential_tittles.append(component)  # if less than 60px in total, it's probably a tittle
     potential_stubs = sorted(potential_stubs, key=lambda component: component.centroid[0])
-    potential_tittles = sorted(potential_tittles, key=lambda component: component.centroid[0])  #Sorts them by their y centroid
+    potential_tittles = sorted(potential_tittles,
+                               key=lambda component: component.centroid[0])  #Sorts them by their y centroid
 
     pairings = {}
     for stub in potential_stubs:
@@ -89,25 +93,28 @@ def join_2_part_letters(components):  # this function joins the tittles in i and
         stub.y = highest_point
         stub.width = new_width
         stub.height = new_height
-        components.remove(tittle)  # assigns the dimensions to the stub, removes the tittle, effectively combining them into one component.
+        components.remove(
+            tittle)  # assigns the dimensions to the stub, removes the tittle, effectively combining them into one component.
 
     return components
 
 
+def swap_x_y(coordinate):
+    y = coordinate[0]
+    x = coordinate[1]
+    coordinate = (x, y)
+    return coordinate
+
+
 def connect_split_letters(file_name):
-    list_file_name = file_name[:-4] + "split_letter_px.npy"
-    # split_letter_npy = numpy.load(os.path.join(list_of_split_px, list_file_name))      # This is a list of all px which are thought to be part of a split letter.
     components = get_all_components(file_name)
     components = join_2_part_letters(components)
+
     split_components = []
     potential_connections = set()
     for component in components:
         if component.split_letter is True:
             split_components.append(component)
-        if component.id in [17, 22, 60, 64, 35, 56, 62, 63]:
-            print(component.x, component.y, component.id)
-
-
 
     split_components = sorted(split_components, key=lambda component: component.y)
     for component_top in split_components:
@@ -119,19 +126,96 @@ def connect_split_letters(file_name):
             bottom_L = component_bottom.x
             bottom_R = bottom_L + component_bottom.width
             bottom_T = component_bottom.y
-            bottom_B = bottom_T + component_bottom.height # Working out the borders for the top and bottom components
+            bottom_B = bottom_T + component_bottom.height  # Working out the borders for the top and bottom components
             if top_B <= bottom_T and top_B + 10 >= bottom_T:
-                if bottom_L <= top_R + 10 and bottom_R + 10 >= top_L and component_top != component_bottom: # Making sure they are close enough to be joined
+                if bottom_L <= top_R + 10 and bottom_R + 10 >= top_L and component_top != component_bottom:  # Making sure they are close enough to be joined
                     potential_connections.add((component_top.id, component_bottom.id))
 
-        
+    components = sorted(components, key=lambda component: component.id)
+    numpy_file = numpy.load(os.path.join(images_binarised_npy, file_name))
+
+    for connection in potential_connections:
+        upper_component = find_component(components, connection[0])
+        lower_component = find_component(components, connection[1])
+        upper_component_bottom_row = upper_component.y + upper_component.height - 1  #if you didn't subtract 1, you'd be looking at the row beneath the bottom row
+        lower_component_top_row = lower_component.y
+        left_bottom = None  #This notation can be slightly confusing. The second half refers to the row, not the component, so left_bottom is the left pixel of the bottom row of the top component etc
+        right_bottom = None
+        left_top = None
+        right_top = None
+        for x_offset in range(0, upper_component.width):
+            pixel_to_check = (upper_component_bottom_row, upper_component.x + x_offset)
+            if numpy_file[pixel_to_check] == 255:
+                if left_bottom is None:
+                    left_bottom = pixel_to_check
+                elif right_bottom is None:
+                    right_bottom = pixel_to_check
+                elif pixel_to_check[1] > right_bottom[1]:
+                    right_bottom = pixel_to_check
+        for x_offset in range(0, lower_component.width):
+            pixel_to_check = (lower_component_top_row, lower_component.x + x_offset)
+            if numpy_file[pixel_to_check] == 255:
+                if left_top is None:
+                    left_top = pixel_to_check
+                elif right_top is None:
+                    right_top = pixel_to_check
+                elif pixel_to_check[1] > right_top[1]:
+                    right_top = pixel_to_check
+        #CV2 functions need coordinates as x,y
+        # print(right_top, right_bottom, left_top, left_bottom)
+
+        cv2.line(numpy_file, swap_x_y(right_bottom), swap_x_y(right_top), (255, 255, 255), 1)
+        # print(f"Drew a line from {swap_x_y(right_bottom)} to {swap_x_y(right_top)}")
+        cv2.line(numpy_file, swap_x_y(left_bottom), swap_x_y(left_top), (255, 255, 255), 1)
+        # print(f"Drew a line from {swap_x_y(left_bottom)} to {swap_x_y(left_top)}")
+
+        leftmost = min(left_bottom[1], left_top[1])
+        rightmost = max(right_bottom[1], right_top[1])
+        width_gap = rightmost - leftmost + 1
+        height_gap = lower_component_top_row - upper_component_bottom_row
+        for y in range(upper_component_bottom_row + 1, lower_component_top_row + 1):
+            for x in range(leftmost + 1, rightmost + 1):
+                # print(x, y)
+                # print(numpy_file[y - 1][x], numpy_file[y - 1][x + 1], numpy_file[y][x - 1])
+                if numpy_file[y - 1][x] == 255 and numpy_file[y - 1][x + 1] == 255 and numpy_file[y][x - 1] == 255:
+                    numpy_file[y][x] = 255
+                    # print("pixel has been changed")
+
+    num_of_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(numpy_file, connectivity=8)
+    new_components = []
+    for component in range(1, num_of_labels):
+        x = stats[component, cv2.CC_STAT_LEFT]
+        y = stats[component, cv2.CC_STAT_TOP]
+        width = stats[component, cv2.CC_STAT_WIDTH]
+        height = stats[component, cv2.CC_STAT_HEIGHT]
+        area = stats[component, cv2.CC_STAT_AREA]
+        centroid = centroids[component]
+        id = component
+        min_size = 5 * 5
+        max_size = 50 * 50  # if its larger or smaller its likely noise rather than a letter
+        if (
+                3 < width < 70 and 5 < height < 70 and min_size < area < max_size):  #in order for it to be considered, it must meet these criteria. Otherwise, it is likely just noise or a leftover from the line removing algorithm.
+            new_components.append(Component(x, y, width, height, area, centroid, id, False))
+    new_components = join_2_part_letters(new_components)
+
+    dest_file_npy = os.path.join(images_binarised_npy, file_name[:-4])
+    dest_file_jpg = os.path.join(images_binarised_jpg, file_name[:-4])
+    numpy_file = close_gaps(numpy_file)
+    cv2.imwrite(dest_file_jpg + ".jpg", numpy_file)
+    numpy.save(dest_file_npy + ".npy", numpy_file)
+    return new_components
 
 
+def close_gaps(numpy_file):
+    kernel = numpy.ones((3, 3), numpy.uint8)
+    closed_image = cv2.morphologyEx(numpy_file, cv2.MORPH_CLOSE, kernel)
+    return closed_image
 
 
-
-
-
+def find_component(components, id):
+    for component in components:
+        if component.id == id:
+            return component
 
 
 def look_through_npys():
@@ -166,6 +250,6 @@ def show_components(image, components, scale=5):
         cv2.destroyAllWindows()
 
 
-connect_split_letters("Scan - 2025-12-28 16_02_44.npy")
-# image = numpy.load(os.path.join(images_binarised_npy, "Scan - 2025-12-28 16_02_44.npy"))
-# show_components(image, join_2_part_letters(get_all_components("Scan - 2025-12-28 16_02_44.npy")))
+# components_outer = connect_split_letters("Scan - 2025-12-28 16_02_44.npy")
+# image = cv2.imread(os.path.join(images_binarised_jpg, "Scan - 2025-12-28 16_02_44.jpg"))
+# show_components(image, components_outer)
