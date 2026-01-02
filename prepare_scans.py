@@ -3,6 +3,7 @@ import fitz
 import cv2
 import numpy
 import segment_scans
+
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
 images_pulled = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_pulled"
 images_binarised_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_npy"
@@ -25,11 +26,14 @@ def copy_new_scans():
 
 def binarise_scan(source_jpg, file_name):
     grayscale_image = cv2.imread(source_jpg, 2)  #reads the image as a grayscale
-    _, black_and_white_image = cv2.threshold(grayscale_image, 127, 255,
-                                             cv2.THRESH_BINARY)  # stores the numpy datain black_and_white image
+    blurred = cv2.GaussianBlur(grayscale_image, (101, 101), 0)
+    normalised = cv2.divide(grayscale_image, blurred, scale=255)
+    _, black_and_white_image = cv2.threshold(normalised, 239, 255, cv2.THRESH_BINARY)  # stores the numpy datain black_and_white image
     black_and_white_image = cv2.bitwise_not(
-        black_and_white_image)  #the segmentation function used looks for white characters on a black background so it must be inverted
+        black_and_white_image)
+    #the segmentation function used looks for white characters on a black background so it must be inverted
     numpy_array = black_and_white_image
+    numpy_array = segment_scans.close_gaps(numpy_array)
     numpy.save(os.path.join(images_binarised_npy, file_name[:-4] + ".npy"), numpy_array)
     return numpy_array, file_name
 
@@ -133,10 +137,8 @@ def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest p
             next_highest = highest_s
         elif numpy_file[highest_l] == 255:
             next_highest = highest_l
-        elif numpy_file[highest_l[0] + 1, highest_l[1]] == 255:
-            next_highest = (highest_l[0] + 1, highest_l[1])
         else:
-            for offset in range(2, 5):
+            for offset in range(2, 6):
                 next_pixel = (min(line_lowest + offset, height-1), line_x + 1)
                 if numpy_file[next_pixel] == 255:
                     next_highest = next_pixel
@@ -158,7 +160,7 @@ def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest p
         elif numpy_file[lowest_h] == 255:
             next_lowest = lowest_h
         else:
-            for offset in range(2, 5):
+            for offset in range(2, 6):
                 next_pixel = (max(0, line_lowest - offset), line_x + 1)
                 if numpy_file[next_pixel] == 255:
                     next_lowest = next_pixel

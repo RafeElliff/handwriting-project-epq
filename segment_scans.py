@@ -49,27 +49,24 @@ def get_all_components(picture_name):
             split_letter = True
         else:
             split_letter = False
-        if (
-                3 < width < 70 and 5 < height < 70 and min_size < area < max_size) or split_letter is True:  #in order for it to be considered, it must meet these criteria. Otherwise, it is likely just noise or a leftover from the line removing algorithm.
-            components_list.append(Component(x, y, width, height, area, centroid, id, split_letter))
+        component = Component(x, y, width, height, area, centroid, id, split_letter)
+        if is_valid_component(component):  #in order for it to be considered, it must meet these criteria. Otherwise, it is likely just noise or a leftover from the line removing algorithm.
+            components_list.append(component)
     return components_list
 
 
-# i = 0
-# for component in connected_components_analysis("Scan - 2025-12-28 16_02_44.npy"):
-#     print(i, component.height/component.width)
-#     i = i + 1
-# print("components:", i)
+
 
 
 def join_2_part_letters(components):  # this function joins the tittles in i and j to their stubs
     potential_stubs = []
     potential_tittles = []
     for component in components:
-        if component.height / component.width > 1.6 and component.height < 40:  # if more than 1.6x as tall as wide, it's probably a stub
+        if component.height / component.width > 1.6 and component.height < 65:  # if more than 1.6x as tall as wide, it's probably a stub
             potential_stubs.append(component)
-        elif component.area < 60:
+        elif 20 < component.area < 120 :
             potential_tittles.append(component)  # if less than 60px in total, it's probably a tittle
+
     potential_stubs = sorted(potential_stubs, key=lambda component: component.centroid[0])
     potential_tittles = sorted(potential_tittles,
                                key=lambda component: component.centroid[0])  #Sorts them by their y centroid
@@ -94,7 +91,8 @@ def join_2_part_letters(components):  # this function joins the tittles in i and
         stub.width = new_width
         stub.height = new_height
         components.remove(
-            tittle)  # assigns the dimensions to the stub, removes the tittle, effectively combining them into one component.
+            tittle) # assigns the dimensions to the stub, removes the tittle, effectively combining them into one component.
+
 
     return components
 
@@ -106,17 +104,51 @@ def swap_x_y(coordinate):
     return coordinate
 
 
+def match_split_components(potential_connections):
+
+    all_components_in_connections = []
+    for top, bottom in potential_connections:
+        all_components_in_connections.append(top)
+        all_components_in_connections.append(bottom)
+
+    multi_partner_components = set()
+    for component in all_components_in_connections:
+        if all_components_in_connections.count(component) > 1:
+            multi_partner_components.add(component)
+
+    # Separate certain vs uncertain connections
+    uncertain_connections = []
+    final_connections = []
+
+    for connection in potential_connections:
+        top, bottom = connection
+        if top in multi_partner_components or bottom in multi_partner_components:
+            uncertain_connections.append(connection)
+        else:
+            final_connections.append(connection)
+
+    matches = {}
+    # for component in multi_partner_components:
+
+
+
 def connect_split_letters(file_name):
+    numpy_file = numpy.load(os.path.join(images_binarised_npy, file_name))
+    numpy_file = morphological_opening(numpy_file)
+    numpy_file = close_gaps(numpy_file)
+    dest_file = os.path.join(images_binarised_npy, file_name)
+    numpy.save(dest_file, numpy_file)
+
     components = get_all_components(file_name)
     components = join_2_part_letters(components)
 
     split_components = []
-    potential_connections = set()
     for component in components:
-        if component.split_letter is True:
+        if component.split_letter is True and is_valid_component(component):
             split_components.append(component)
 
     split_components = sorted(split_components, key=lambda component: component.y)
+    potential_connections = set()
     for component_top in split_components:
         top_L = component_top.x
         top_R = top_L + component_top.width
@@ -128,15 +160,16 @@ def connect_split_letters(file_name):
             bottom_T = component_bottom.y
             bottom_B = bottom_T + component_bottom.height  # Working out the borders for the top and bottom components
             if top_B <= bottom_T and top_B + 10 >= bottom_T:
-                if bottom_L <= top_R + 10 and bottom_R + 10 >= top_L and component_top != component_bottom:  # Making sure they are close enough to be joined
-                    potential_connections.add((component_top.id, component_bottom.id))
+                if (top_L <= bottom_L <= top_R or bottom_L <= top_L <= bottom_R or top_L <= bottom_R <= top_R or bottom_L <= top_R <= bottom_R) and component_top != component_bottom:  # Making sure they are close enough to be joined
+                    potential_connections.add((component_top, component_bottom))
+    # potential_connections = match_split_components(raw_potential_connections)
+
 
     components = sorted(components, key=lambda component: component.id)
-    numpy_file = numpy.load(os.path.join(images_binarised_npy, file_name))
-
+    num_of_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(numpy_file, connectivity=8)
     for connection in potential_connections:
-        upper_component = find_component(components, connection[0])
-        lower_component = find_component(components, connection[1])
+        upper_component = connection[0]
+        lower_component = connection[1]
         upper_component_bottom_row = upper_component.y + upper_component.height - 1  #if you didn't subtract 1, you'd be looking at the row beneath the bottom row
         lower_component_top_row = lower_component.y
         left_bottom = None  #This notation can be slightly confusing. The second half refers to the row, not the component, so left_bottom is the left pixel of the bottom row of the top component etc
@@ -145,7 +178,7 @@ def connect_split_letters(file_name):
         right_top = None
         for x_offset in range(0, upper_component.width):
             pixel_to_check = (upper_component_bottom_row, upper_component.x + x_offset)
-            if numpy_file[pixel_to_check] == 255:
+            if numpy_file[pixel_to_check] == 255 and labels[pixel_to_check] == upper_component.id:
                 if left_bottom is None:
                     left_bottom = pixel_to_check
                 elif right_bottom is None:
@@ -154,7 +187,7 @@ def connect_split_letters(file_name):
                     right_bottom = pixel_to_check
         for x_offset in range(0, lower_component.width):
             pixel_to_check = (lower_component_top_row, lower_component.x + x_offset)
-            if numpy_file[pixel_to_check] == 255:
+            if numpy_file[pixel_to_check] == 255 and labels[pixel_to_check] == lower_component.id:
                 if left_top is None:
                     left_top = pixel_to_check
                 elif right_top is None:
@@ -162,55 +195,50 @@ def connect_split_letters(file_name):
                 elif pixel_to_check[1] > right_top[1]:
                     right_top = pixel_to_check
         #CV2 functions need coordinates as x,y
-        # print(right_top, right_bottom, left_top, left_bottom)
+        if right_bottom and right_top and left_bottom and left_top:
+            cv2.line(numpy_file, swap_x_y(right_bottom), swap_x_y(right_top), (255, 255, 255), 1)
+            print(f"Drew a line from {swap_x_y(right_bottom)} to {swap_x_y(right_top)}")
+            cv2.line(numpy_file, swap_x_y(left_bottom), swap_x_y(left_top), (255, 255, 255), 1)
+            print(f"Drew a line from {swap_x_y(left_bottom)} to {swap_x_y(left_top)}")
 
-        cv2.line(numpy_file, swap_x_y(right_bottom), swap_x_y(right_top), (255, 255, 255), 1)
-        # print(f"Drew a line from {swap_x_y(right_bottom)} to {swap_x_y(right_top)}")
-        cv2.line(numpy_file, swap_x_y(left_bottom), swap_x_y(left_top), (255, 255, 255), 1)
-        # print(f"Drew a line from {swap_x_y(left_bottom)} to {swap_x_y(left_top)}")
+            leftmost = min(left_bottom[1], left_top[1])
+            rightmost = max(right_bottom[1], right_top[1])
+            width_gap = rightmost - leftmost + 1
+            height_gap = lower_component_top_row - upper_component_bottom_row
+            for y in range(upper_component_bottom_row + 1, lower_component_top_row + 1):
+                for x in range(leftmost + 1, rightmost + 1):
+                    if numpy_file[y - 1][x] == 255 and numpy_file[y - 1][x + 1] == 255 and numpy_file[y][x - 1] == 255:
+                        numpy_file[y][x] = 255
 
-        leftmost = min(left_bottom[1], left_top[1])
-        rightmost = max(right_bottom[1], right_top[1])
-        width_gap = rightmost - leftmost + 1
-        height_gap = lower_component_top_row - upper_component_bottom_row
-        for y in range(upper_component_bottom_row + 1, lower_component_top_row + 1):
-            for x in range(leftmost + 1, rightmost + 1):
-                # print(x, y)
-                # print(numpy_file[y - 1][x], numpy_file[y - 1][x + 1], numpy_file[y][x - 1])
-                if numpy_file[y - 1][x] == 255 and numpy_file[y - 1][x + 1] == 255 and numpy_file[y][x - 1] == 255:
-                    numpy_file[y][x] = 255
-                    # print("pixel has been changed")
-
-    num_of_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(numpy_file, connectivity=8)
-    new_components = []
-    for component in range(1, num_of_labels):
-        x = stats[component, cv2.CC_STAT_LEFT]
-        y = stats[component, cv2.CC_STAT_TOP]
-        width = stats[component, cv2.CC_STAT_WIDTH]
-        height = stats[component, cv2.CC_STAT_HEIGHT]
-        area = stats[component, cv2.CC_STAT_AREA]
-        centroid = centroids[component]
-        id = component
-        min_size = 5 * 5
-        max_size = 50 * 50  # if its larger or smaller its likely noise rather than a letter
-        if (
-                3 < width < 70 and 5 < height < 70 and min_size < area < max_size):  #in order for it to be considered, it must meet these criteria. Otherwise, it is likely just noise or a leftover from the line removing algorithm.
-            new_components.append(Component(x, y, width, height, area, centroid, id, False))
-    new_components = join_2_part_letters(new_components)
-
+    components = get_all_components(file_name)
+    components = join_2_part_letters(components)
     dest_file_npy = os.path.join(images_binarised_npy, file_name[:-4])
     dest_file_jpg = os.path.join(images_binarised_jpg, file_name[:-4])
-    numpy_file = close_gaps(numpy_file)
     cv2.imwrite(dest_file_jpg + ".jpg", numpy_file)
     numpy.save(dest_file_npy + ".npy", numpy_file)
-    return new_components
+    return components
 
+def is_valid_component(component):
+    size = False
+    area = False
+    aspect_ratio = False
+    if 5 < component.width < 75 and 5 < component.height < 90 or component.split_letter:
+        size = True
+    if 10 < component.area < 2500:
+        area = True
+    if 0.2 < component.width/component.height < 5:
+        aspect_ratio = True
+    return (size and area and aspect_ratio)
 
 def close_gaps(numpy_file):
     kernel = numpy.ones((3, 3), numpy.uint8)
     closed_image = cv2.morphologyEx(numpy_file, cv2.MORPH_CLOSE, kernel)
     return closed_image
 
+def morphological_opening(numpy_file):
+    kernel = numpy.ones((3, 3), numpy.uint8)
+    cleaned = cv2.morphologyEx(numpy_file, cv2.MORPH_OPEN, kernel)
+    return cleaned
 
 def find_component(components, id):
     for component in components:
@@ -228,7 +256,8 @@ def look_through_npys():
         cv2.waitKey(0)  #waits for a key press before moving
         cv2.destroyAllWindows()
 
-
+def remove_extra_components(numpy_file):
+    pass
 # look_through_npys()
 
 
@@ -250,6 +279,8 @@ def show_components(image, components, scale=5):
         cv2.destroyAllWindows()
 
 
+# components_outer = connect_split_letters("standardise_1.npy")
+# image = cv2.imread(os.path.join(images_binarised_jpg, "standardise_1.jpg"))
 # components_outer = connect_split_letters("Scan - 2025-12-28 16_02_44.npy")
 # image = cv2.imread(os.path.join(images_binarised_jpg, "Scan - 2025-12-28 16_02_44.jpg"))
 # show_components(image, components_outer)
