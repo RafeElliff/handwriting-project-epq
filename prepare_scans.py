@@ -6,8 +6,8 @@ import segment_scans
 
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
 images_pulled = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_pulled"
-images_binarised_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_npy"
-images_binarised_jpg = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_binarised_jpg"
+images_prepared_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_npy"
+images_prepared_jpg = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_jpg"
 list_of_split_px_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\list_of_split_px"
 
 
@@ -34,19 +34,20 @@ def binarise_scan(source_jpg, file_name):
     #the segmentation function used looks for white characters on a black background so it must be inverted
     numpy_array = black_and_white_image
     numpy_array = segment_scans.close_gaps(numpy_array)
-    numpy.save(os.path.join(images_binarised_npy, file_name[:-4] + ".npy"), numpy_array)
+    # numpy_array = segment_scans.morphological_opening(numpy_array)
+    numpy.save(os.path.join(images_prepared_npy, file_name[:-4] + ".npy"), numpy_array)
     return numpy_array, file_name
 
 
 def save_numpys():
     for file_name in os.listdir(images_pulled):
-        if file_name not in os.listdir(images_binarised_npy):
+        if file_name not in os.listdir(images_prepared_npy):
             file_name_no_stem = file_name[:-4]
             source_jpg = os.path.join(images_pulled, file_name)
             binary_scan, file_name = binarise_scan(source_jpg, file_name)
             numpy_file, file_name = remove_lines(binary_scan, file_name)
-            dest_file_npy = os.path.join(images_binarised_npy, file_name_no_stem)
-            dest_file_jpg = os.path.join(images_binarised_jpg, file_name_no_stem)
+            dest_file_npy = os.path.join(images_prepared_npy, file_name_no_stem)
+            dest_file_jpg = os.path.join(images_prepared_jpg, file_name_no_stem)
             cv2.imwrite(dest_file_jpg + ".jpg", binary_scan)
             numpy.save(dest_file_npy + ".npy", numpy_file)
 
