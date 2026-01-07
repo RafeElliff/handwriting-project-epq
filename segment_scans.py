@@ -273,17 +273,31 @@ def full_segmentation_pipeline(npy_filename):
     components, CCA_info = join_2_part_letters(components, CCA_info, numpy_array)
     numpy_array, components = clean_up_scan(components, CCA_info, numpy_array)
     components = remove_null_components(components, numpy_array)
-    return numpy_array, components
+    return numpy_array, components, npy_filename
+
+def get_npy_images(components, npy_filename, numpy_array):
+    resized_list = []
+    resized_ids_list = []
+    for component in components:
+        component_numpy_array = numpy_array[component.y: component.y + component.height, component.x: component.x + component.width]
+        resized = resize_to_28_x_28(component_numpy_array)
+        resized_list.append(resized)
+        resized_ids_list.append(component.id)
+    return components, resized_list, npy_filename
 
 
+def resize_to_28_x_28(numpy_array):
+    resized = cv2.resize(numpy_array, (28, 28), interpolation= cv2.INTER_LINEAR)
+    return resized
 
-numpy_array, components = full_segmentation_pipeline("gold standard scan.npy")
-dest_file = os.path.join(images_processed_jpg, "gold standard scan.jpg")
-cv2.imwrite(dest_file, numpy_array)
-numpy_array, components = full_segmentation_pipeline("standardise_1.npy")
-dest_file = os.path.join(images_processed_jpg, "standardise_1.jpg")
-cv2.imwrite(dest_file, numpy_array)
-numpy_array, components = full_segmentation_pipeline("standardise_3.npy")
-dest_file = os.path.join(images_processed_jpg, "standardise_3.jpg")
-cv2.imwrite(dest_file, numpy_array)
-show_components(numpy_array, components)
+
+# numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
+# dest_file = os.path.join(images_processed_jpg, "gold standard scan.jpg")
+# cv2.imwrite(dest_file, numpy_array)
+# numpy_array, components = full_segmentation_pipeline("standardise_1.npy")
+# dest_file = os.path.join(images_processed_jpg, "standardise_1.jpg")
+# cv2.imwrite(dest_file, numpy_array)
+# numpy_array, components = full_segmentation_pipeline("standardise_3.npy")
+# dest_file = os.path.join(images_processed_jpg, "standardise_3.jpg")
+# cv2.imwrite(dest_file, numpy_array)
+# show_components(numpy_array, components)
