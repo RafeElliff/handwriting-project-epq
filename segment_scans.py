@@ -287,11 +287,13 @@ def get_npy_images(components, npy_filename, numpy_array):
 
 
 def resize_to_28_x_28(numpy_array):
-    resized = cv2.resize(numpy_array, (28, 28), interpolation= cv2.INTER_LINEAR)
-    return resized
+    resized = cv2.resize(numpy_array, (24, 24), interpolation= cv2.INTER_LINEAR)
+    padded = numpy.pad(resized, 2, mode='constant')
+    print(padded)
+    return padded
 
 
-# numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
+numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
 # dest_file = os.path.join(images_processed_jpg, "gold standard scan.jpg")
 # cv2.imwrite(dest_file, numpy_array)
 # numpy_array, components = full_segmentation_pipeline("standardise_1.npy")
