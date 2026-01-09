@@ -1,8 +1,11 @@
+import numpy as np
+
 import segment_scans
 
 import tensorflow_datasets
 
 import numpy
+import math
 
 training_dataset, dataset_info = tensorflow_datasets.load(
     'emnist/byclass',
@@ -91,22 +94,63 @@ def scale_array_to_0_to_1(numpy_array):
     scaled = numpy.divide(numpy_array, 255)
     return scaled
 
-print(len(images))
-print(images[501], scale_array_to_0_to_1(images[501]), id_to_letters[int(labels[501])])
 
 
-# numpy_array, components, npy_filename = segment_scans.full_segmentation_pipeline("gold standard scan.npy")
-# components, npy_arrays_to_analyse, npy_filename = segment_scans.get_npy_images(components, npy_filename, numpy_array)
-# for array in npy_arrays_to_analyse:
-#     print(array)
 
-# class CONV_layer:
-#
-#
-# class ReLU_layer:
-#
-# class Linear_Layer:
-#
-# class POOL_Layer:
+class Linear_Layer:
+    def __init__(self, num_of_inputs, num_of_neurons):
+        self.num_of_inputs = num_of_inputs
+        self.num_of_neurons = num_of_neurons
+        weights = numpy.random.randn(num_of_neurons, num_of_inputs) * math.sqrt(2/num_of_inputs)
+        self.weights = weights
+        self.bias = np.zeros(num_of_neurons)
+        self.input = None
+    def forward_pass(self, input):
+        self.input = input
+        output = numpy.matmul(input, self.weights)
+        return output
+    def backprop(self, dOutput):
+        dInput = numpy.matmul(dOutput, numpy.transpose(self.weights))
+        dWeights = dOutput * self.input
+        dBias = dOutput
+        return dInput, dWeights, dBias
 
-# KGAT_0b07f5dd603ee0e590386993d742a798
+
+
+
+class ReLU_Layer:
+    def __init__(self):
+        self.input = None
+        self.output = None
+
+    def forward_pass(self, input):
+        self.input = input
+        output = numpy.maximum(0, input)
+        self.output = output
+        return output
+
+    def backprop(self, dOutput): # The naming here can be a bit confusing. 'Input' and 'Output' always refer to the forward pass, so confusingly here we take dOutput and compute dInput from that.
+        input = self.input
+        output = self.output
+        mask = numpy.minimum(1, output)
+        dInput = dOutput * mask
+        return dInput
+
+def SVM_loss(answers, ground_truth):
+    correct_score = answers[ground_truth]
+    total_loss = 0
+    margin = 1
+    violating_classes = 0
+    dLoss = numpy.zeros((len(answers), 1)) #dLoss/dAnswers
+
+
+    for index in range (0, len(answers)):
+        if answers[index] - correct_score + margin > 0 and index != ground_truth:
+            violating_classes = violating_classes - 1
+            dLoss[index] = 1
+            total_loss = total_loss + (answers[index] - correct_score + margin)
+
+    dLoss[ground_truth] = violating_classes
+
+    return total_loss, dLoss
+
