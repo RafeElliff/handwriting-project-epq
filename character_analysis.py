@@ -3,13 +3,17 @@ import tensorflow_datasets
 import numpy
 import math
 import time
-training_dataset, dataset_info = tensorflow_datasets.load(
-    'emnist/byclass',
-    split='train[:16000]',
-    #Processing all of the data takes a fair bit of time. I'm choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
+import pickle
+
+
+datasets, dataset_info = tensorflow_datasets.load(
+    "emnist/byclass",
+    split=["train[:1]", "test"],
+    #Processing all of the data takes a fair bit of time. "m choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
     as_supervised=True,
     with_info=True)
-
+training_dataset = datasets[0]
+testing_dataset = datasets[1]
 id_to_letters = {
     0: "0",
     1: "1",
@@ -79,6 +83,8 @@ labels = []
 counter = 0
 training_images = []
 training_labels = []
+testing_images = []
+testing_labels = []
 def scale_array_to_0_to_1(numpy_array):
     scaled = numpy.divide(numpy_array, 255)
     return scaled
@@ -92,10 +98,17 @@ for image, label in training_dataset:
     training_images.append(flattened)
     training_labels.append(numpy.array(label))
 
+for image, label in testing_dataset:
+
+    image = numpy.array(image)
+    scaled = scale_array_to_0_to_1(image)
+    transposed = numpy.transpose(scaled)
+    flattened = transposed.flatten()
+    testing_images.append(flattened)
+    testing_labels.append(numpy.array(label))
+
+
 print("Image preparation done")
-
-
-layer_ids = [-1] #-1 does not correspond to a layer, it is just to avoid error handling
 
 
 class Linear_Layer:
@@ -117,8 +130,8 @@ class Linear_Layer:
         dInput = numpy.matmul(dOutput, numpy.transpose(self.weights))
         dWeights = numpy.outer(self.input, dOutput)
         dBias = dOutput
-        gradients[self.id]["weights"] = dWeights
-        gradients[self.id]["bias"] = dBias
+        classifier.gradients[self.id]["weights"] = dWeights
+        classifier.gradients[self.id]["bias"] = dBias
         return dInput
 
 
@@ -142,7 +155,7 @@ class ReLU_Layer:
         dInput = dOutput * self.mask
         return dInput
 
-class Adam_optimiser:
+class Adam_Optimiser:
     def __init__(self, learning_rate, layers, beta1, beta2, eps):
         self.learning_rate = learning_rate
         self.layers = layers
@@ -218,6 +231,7 @@ def SVM_loss(answers, ground_truth):
     return total_loss, dLoss, correct
 
 
+layer_ids = [-1] #-1 does not correspond to a layer, it is just to avoid error handling
 layer_1 = Linear_Layer(784, 256)
 layer_2 = ReLU_Layer()
 layer_3 = Linear_Layer(256, 128)
@@ -234,56 +248,110 @@ layers = [
     layer_6,
     layer_7
 ]
-optimiser = Adam_optimiser(0.001, layers, 0.9, 0.999, 0.00000001)
-optimiser.zero_gradients(layers)
-loss_best = 10 ** 10
-epoch_loss_best = -1
-for epoch in range (0, 10**10):
 
-    time_tuple = time.localtime()
-    time_at_start = str(time_tuple[3]) + ":" + str(time_tuple[4]) + ":" + str(time_tuple[5])
-    seconds_at_start = time.time()
-    print(f"time at start of epoch {epoch} = {time_at_start}")
-    loss_total = 0
-    total_correct = 0
-    for index in range (0, len(training_images)):
-        gradients = {}
+class Classification_Model():
+    def __init__(self, layers):
+        self.optimiser = Adam_Optimiser(0.001, layers, 0.9, 0.999, 0.00000001)
+        self.optimiser.zero_gradients(layers)
+        self.loss_best = 10 ** 5
+        self.epoch_loss_best = -1
+        self.gradients = {}
+        self.layers = layers
+    def train(self):
+        self.optimiser = Adam_Optimiser(0.001, layers, 0.9, 0.999, 0.00000001)
+        self.optimiser.zero_gradients(layers)
+        self.loss_best = 10 ** 5
+        self.epoch_loss_best = -1
+        self.gradients = {}
+        for epoch in range (0, 25):
+            time_tuple = time.localtime()
+            time_at_start = str(time_tuple[3]) + ":" + str(time_tuple[4]) + ":" + str(time_tuple[5])
+            seconds_at_start = time.time()
+            print(f"time at start of epoch {epoch} = {time_at_start}")
+            loss_total = 0
+            total_correct = 0
+            for index in range (0, len(training_images)):
+                self.gradients = {}
+                for layer in layers:
+                    self.gradients[layer.id] = {
+                        "weights": None,
+                        "bias": None
+                    }
+                flattened_image = training_images[index]
+                ground_truth = training_labels[index]
+                forward = flattened_image
+                for layer in layers:
+                    forward = layer.forward_pass(forward)
+
+                loss, dLoss, correct = SVM_loss(forward, ground_truth)
+                loss_total = loss_total + loss
+
+                backward = dLoss
+                layers.reverse()
+                for layer in layers:
+                    backward = layer.backprop(backward)
+                layers.reverse()
+                self.optimiser.step(self.gradients)
+                if correct:
+                    total_correct = total_correct + 1
+            average_loss = round(loss_total/len(training_images), 2)
+            seconds_at_finish = time.time()
+
+            average_correct = total_correct / len(training_images)
+            print(f"Epoch {epoch}, loss = {average_loss}, time to run = {round((seconds_at_finish-seconds_at_start), 2)}, accuracy % = {round(average_correct * 100, 5)}")
+            if average_loss < self.loss_best:
+                self.loss_best = average_loss
+                self.epoch_loss_best = epoch
+
+            if epoch - self.epoch_loss_best > 5:
+                break
+        print(f"Best epoch = {self.epoch_loss_best}, with loss {self.loss_best}")
+
+    def save_parameters(self):
+        for layer in self.layers:
+            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
+            with open(filename, "wb") as file:
+                pickle.dump(layer, file)
+
+    def load_parameters(self):
+        layers_with_params = []
         for layer in layers:
-            gradients[layer.id] = {
-                "weights": None,
-                "bias": None
-            }
-        flattened_image = training_images[index]
-        ground_truth = training_labels[index]
-        forward = flattened_image
+            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
+            with open(filename, "rb") as file:
+                layer = pickle.load(file)
+                layers_with_params.append(layer)
+        self.layers = layers_with_params
+        return layers_with_params
+
+    def accuracy_checK(self):
+        print("Accuracy Check Started")
+        correct_counter = 0
+        for index in range (0, len(testing_images)):
+            image = testing_images[index]
+            label = testing_labels[index]
+            forward = image
+            for layer in layers:
+                forward = layer.forward_pass(forward)
+            prediction = numpy.argmax(forward)
+            if prediction == label:
+                correct_counter = correct_counter + 1
+        print("Accuracy Check ended")
+        return round((correct_counter / len(testing_images) * 100), 2)
+
+    def get_prediction(self, image):
+        forward = image
         for layer in layers:
             forward = layer.forward_pass(forward)
-
-        loss, dLoss, correct = SVM_loss(forward, ground_truth)
-        loss_total = loss_total + loss
-
-        backward = dLoss
-        layers.reverse()
-        for layer in layers:
-            backward = layer.backprop(backward)
-        layers.reverse()
-        optimiser.step(gradients)
-        if correct:
-            total_correct = total_correct + 1
-    average_loss = round(loss_total/len(training_images), 2)
-    seconds_at_finish = time.time()
-
-    average_correct = total_correct / len(training_images)
-    print(f"Epoch {epoch}, loss = {average_loss}, time to run = {round((seconds_at_finish-seconds_at_start), 2)}, accuracy % = {round(average_correct * 100, 5)}")
-    if average_loss < loss_best:
-        loss_best = average_loss
-        epoch_loss_best = epoch
-
-    if epoch - epoch_loss_best > 5:
-        print(f"Best epoch = {epoch_loss_best}, with loss {loss_best}")
-        break
+        prediction = numpy.argmax(forward)
+        certainty = numpy.argmax(forward) #THIS CODE ISN'T FINISHED YET
+        return prediction, certainty
 
 
 
 
-
+classifier = Classification_Model(layers)
+# classifier.train()
+# classifier.save_parameters()
+layers_with_params = classifier.load_parameters()
+print(classifier.accuracy_checK())
+# print(layers_with_params[0].bias)
