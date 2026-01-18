@@ -8,7 +8,7 @@ import pickle
 
 datasets, dataset_info = tensorflow_datasets.load(
     "emnist/byclass",
-    split=["train[:1]", "test"],
+    split=["train[:1000]", "test[:1000]"],
     #Processing all of the data takes a fair bit of time. "m choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
     as_supervised=True,
     with_info=True)
@@ -87,24 +87,26 @@ testing_images = []
 testing_labels = []
 def scale_array_to_0_to_1(numpy_array):
     scaled = numpy.divide(numpy_array, 255)
-    return scaled
+    scaled_reshaped = numpy.reshape(scaled, (28, 28))
+    return scaled_reshaped
 
 for image, label in training_dataset:
 
     image = numpy.array(image)
     scaled = scale_array_to_0_to_1(image)
     transposed = numpy.transpose(scaled)
-    flattened = transposed.flatten()
-    training_images.append(flattened)
+    reshaped = numpy.reshape(transposed, (28, 28, 1))
+    # flattened = transposed.flatten()
+    training_images.append(reshaped)
     training_labels.append(numpy.array(label))
 
 for image, label in testing_dataset:
-
     image = numpy.array(image)
     scaled = scale_array_to_0_to_1(image)
     transposed = numpy.transpose(scaled)
-    flattened = transposed.flatten()
-    testing_images.append(flattened)
+    reshaped = numpy.reshape(transposed, (28, 28, 1))
+    # flattened = transposed.flatten()
+    testing_images.append(reshaped)
     testing_labels.append(numpy.array(label))
 
 
@@ -155,6 +157,129 @@ class ReLU_Layer:
         dInput = dOutput * self.mask
         return dInput
 
+class CONV_Layer:
+    def __init__(self, kernel_size, num_of_filters, stride, input_depth, input_width):
+        self.kernel_size = kernel_size
+        self.num_of_filters = num_of_filters
+        self.stride = stride
+        self.padding = (kernel_size-1)//2
+        self.input_depth = input_depth
+        self.input_width = input_width
+        self.id = layer_ids[-1] + 1
+        layer_ids.append(self.id)
+        self.type = "CONV_Layer"
+        self.initialise_filter_weights()
+    def initialise_filter_weights(self):
+        self.filters = {}
+        num_of_filters = self.num_of_filters
+        for filter in range (0, num_of_filters):
+            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth) * math.sqrt(2//self.num_of_filters)
+            bias = 0
+            self.filters[filter] = {
+                "weights": weights,
+                "bias": bias
+            }
+
+    def forward_pass(self, image):
+        padded = numpy.pad(image, ((self.padding, self.padding), (self.padding, self.padding), (0,0)), mode='constant')
+        self.input = padded
+        self.original_image = image
+        filters = self.filters
+        height, width, depth = padded.shape
+        padding_px = height - self.input_width
+        starting_pixel = 0 + padding_px//2
+        activation_map = {}
+        offset_size = (self.kernel_size - 1) // 2
+        num_of_scores = (height - padding_px) // self.stride
+        for filter in range (0, self.num_of_filters):
+            scores = numpy.zeros((num_of_scores, num_of_scores))
+            weights = filters[filter]["weights"]
+            bias = filters[filter]["bias"]
+            output_row = -1
+            for row in range(starting_pixel, starting_pixel + self.input_width, self.stride):
+                output_row = output_row + 1
+                output_column = -1
+                for column in range(starting_pixel, starting_pixel + self.input_width, self.stride):
+                    output_column = output_column + 1
+                    pixels_to_check = padded[row-offset_size: row+offset_size+1, column-offset_size: column+offset_size+1, :]
+                    product = (weights * pixels_to_check)
+                    score = numpy.sum(product) + bias
+                    scores[output_row, output_column] = score
+
+            activation_map[filter] = scores
+        scores_3d = numpy.zeros((height-padding_px, width-padding_px, self.num_of_filters))
+        for id in range(0, self.num_of_filters):
+            scores_3d[:, :, id] = activation_map[id]
+        return scores_3d
+
+    def backprop(self, dOutput):
+        dWeights = {}
+        dBias = {}
+        filters = self.filters
+        dInput = numpy.zeros_like(self.input)
+        for id, inner_dictionary in filters.items():
+            total_dWeight = 0
+            #Here, we want to get all 28*28 starting pixels, find dLoss/dWeights at this point, and then add it up.
+            padded = self.input
+            height, width, depth = padded.shape
+            padding_px = height - self.input_width
+            starting_pixel = 0 + padding_px // 2
+            offset_size = (self.kernel_size - 1)//2
+            output_row = -1
+            for row in range (starting_pixel, starting_pixel+self.input_width, self.stride):
+                output_row = output_row + 1
+                output_column = -1
+                for column in range(starting_pixel, starting_pixel+self.input_width, self.stride):
+                    output_column = output_column + 1
+                    row_start = row - offset_size
+                    row_end = row + offset_size + 1
+                    column_start = column - offset_size
+                    column_end = column + offset_size + 1
+                    pixels_to_check = padded[row_start:row_end, column_start:column_end, :]
+                    grad = dOutput[output_row, output_column, id]
+                    dWeight = grad * pixels_to_check
+                    total_dWeight = total_dWeight + dWeight
+            dBias = numpy.sum(dOutput[:, :, id])
+
+            classifier.gradients[self.id][id]["weights"] = total_dWeight
+            classifier.gradients[self.id][id]["bias"] = dBias
+
+
+
+
+            gradient_filter = dOutput[:, :, id]
+            height_gradients, width_gradients = gradient_filter.shape
+            weights_for_filter = inner_dictionary["weights"]
+            rotated_weights = numpy.rot90(weights_for_filter, 2)
+            step_size = self.stride
+            for grad_row in range (0, height_gradients):
+                for grad_column in range (0, width_gradients):
+                    input_row = starting_pixel + (grad_row * step_size)
+                    input_column = starting_pixel +(grad_column * step_size)
+                    grad_value = gradient_filter[grad_row, grad_column]
+                    row_start = input_row - offset_size
+                    row_end = input_row+ offset_size + 1
+                    column_start = input_column - offset_size
+                    column_end = input_column + offset_size + 1
+                    dInput[row_start: row_end, column_start:column_end] = dInput[row_start:row_end, column_start:column_end] + grad_value * rotated_weights
+        dInput = dInput[self.padding: -self.padding, self.padding: -self.padding, :]
+
+        return dInput
+
+class Flatten_Layer:
+    def __init__(self):
+        self.id = layer_ids[-1] + 1
+        layer_ids.append(self.id)
+        self.type = "Flatten_Layer"
+    def forward_pass(self, input):
+        self.input_shape = input.shape
+        flattened = input.flatten()
+        return flattened
+
+    def backprop(self, dOutput_flat):
+        dOutput_3d = numpy.reshape(dOutput_flat, self.input_shape)
+        return dOutput_3d
+
 class Adam_Optimiser:
     def __init__(self, learning_rate, layers, beta1, beta2, eps):
         self.learning_rate = learning_rate
@@ -178,6 +303,33 @@ class Adam_Optimiser:
                     "weights": numpy.zeros_like(layer.weights),
                     "bias": numpy.zeros_like(layer.bias)
                 }
+            elif layer.type == "CONV_Layer":
+                self.m[layer.id] = {}
+                self.v[layer.id] = {}
+                for filter in range(0, layer.num_of_filters):
+                    self.m[layer.id][filter] = {
+                        "weights": numpy.zeros_like(layer.filters[filter]["weights"]),
+                        "bias": 0
+                    }
+                    self.v[layer.id][filter] = {
+                        "weights": numpy.zeros_like(layer.filters[filter]["weights"]),
+                        "bias": 0
+                    }
+        # for layer in layers:
+        #     if layer.type == "CONV_Layer":
+        #         self.gradients[layer.id] = {}
+        #         for filter_id in range(layer.num_of_filters):
+        #             self.gradients[layer.id][filter_id] = {
+        #                 "weights": None,
+        #                 "bias": None
+        #             }
+        #     else:
+        #         self.gradients[layer.id] = {
+        #             "weights": None,
+        #             "bias": None
+        #         }
+
+
     def step(self, gradients):
         self.timestep = self.timestep + 1
         for layer in self.layers:
@@ -207,6 +359,34 @@ class Adam_Optimiser:
                 self.v[layer.id]["bias"] = v_bias
 
 
+            elif layer.type == "CONV_Layer":
+                for filter in range(0, layer.num_of_filters):
+                    m_weights = self.m[layer.id][filter]["weights"]
+                    m_bias = self.m[layer.id][filter]["bias"]
+                    v_weights = self.v[layer.id][filter]["weights"]
+                    v_bias = self.v[layer.id][filter]["bias"]
+                    dWeights = gradients[layer.id][filter]["weights"]
+                    dBias = gradients[layer.id][filter]["bias"]
+
+                    m_weights = self.beta1 * m_weights + (1 - self.beta1) * dWeights
+                    v_weights = self.beta2 * v_weights + (1 - self.beta2) * (dWeights ** 2)
+                    m_weights_protected = m_weights / (1 - self.beta1 ** self.timestep)
+                    v_weights_protected = v_weights / (1 - self.beta2 ** self.timestep)
+                    layer.filters[filter]["weights"] = layer.filters[filter]["weights"] - (self.learning_rate * m_weights_protected) / ( numpy.sqrt(v_weights_protected) + self.eps)
+                    self.m[layer.id][filter]["weights"] = m_weights
+                    self.v[layer.id][filter]["weights"] = v_weights
+
+                    m_bias = self.beta1 * m_bias + (1 - self.beta1) * dBias
+                    v_bias = self.beta2 * v_bias + (1 - self.beta2) * (dBias ** 2)
+                    m_bias_protected = m_bias / (1 - self.beta1 ** self.timestep)
+                    v_bias_protected = v_bias / (1 - self.beta2 ** self.timestep)
+                    change = (self.learning_rate * m_bias_protected) / (numpy.sqrt(v_bias_protected) + self.eps)
+                    layer.filters[filter]["bias"] = layer.filters[filter]["bias"] - change
+
+                    self.m[layer.id][filter]["bias"] = m_bias
+                    self.v[layer.id][filter]["bias"] = v_bias
+
+
 def SVM_loss(answers, ground_truth):
     correct_score = answers[ground_truth]
     total_loss = 0
@@ -232,21 +412,23 @@ def SVM_loss(answers, ground_truth):
 
 
 layer_ids = [-1] #-1 does not correspond to a layer, it is just to avoid error handling
-layer_1 = Linear_Layer(784, 256)
-layer_2 = ReLU_Layer()
-layer_3 = Linear_Layer(256, 128)
-layer_4 = ReLU_Layer()
-layer_5 = Linear_Layer(128, 64)
-layer_6 = ReLU_Layer()
-layer_7 = Linear_Layer(64, 62)
+
+layer_0 = CONV_Layer(3, 32, 1, 1, 28)
+layer_1 = ReLU_Layer()
+layer_2 = CONV_Layer(3, 64, 1, 32, 28)
+layer_3 = ReLU_Layer()  #dOutput = 28*28*64
+layer_4 = CONV_Layer(3, 128, 1, 64, 28)#dOutput = 28*28*128
+layer_5 = Flatten_Layer() #dOutput = 100352
+layer_6 = Linear_Layer(28*28*128, 62) #dOutput = 62
+
 layers = [
+    layer_0,
     layer_1,
     layer_2,
     layer_3,
     layer_4,
     layer_5,
     layer_6,
-    layer_7
 ]
 
 class Classification_Model():
@@ -271,18 +453,30 @@ class Classification_Model():
             loss_total = 0
             total_correct = 0
             for index in range (0, len(training_images)):
+                seconds_at_start_of_image = time.time()
                 self.gradients = {}
                 for layer in layers:
-                    self.gradients[layer.id] = {
-                        "weights": None,
-                        "bias": None
-                    }
-                flattened_image = training_images[index]
+                    if layer.type == "CONV_Layer":
+                        self.gradients[layer.id] = {}
+                        for filter in range(0, layer.num_of_filters):
+                            self.gradients[layer.id][filter] = {
+                                "weights": None,
+                                "bias": None
+                            }
+                    else:
+                        self.gradients[layer.id] = {
+                            "weights": None,
+                            "bias": None
+                        }
+
+                initial_image = training_images[index]
                 ground_truth = training_labels[index]
-                forward = flattened_image
+                forward = initial_image
                 for layer in layers:
                     forward = layer.forward_pass(forward)
-
+                print(f"Forward for image {index} done")
+                seconds_after_forward = time.time()
+                print(f"time for forward = {seconds_after_forward - seconds_at_start_of_image}")
                 loss, dLoss, correct = SVM_loss(forward, ground_truth)
                 loss_total = loss_total + loss
 
@@ -290,10 +484,14 @@ class Classification_Model():
                 layers.reverse()
                 for layer in layers:
                     backward = layer.backprop(backward)
+                print(f"Backprop for image {index} done")
+                seconds_after_backward = time.time()
+                print(f"time for backward = {seconds_after_backward-seconds_after_forward}")
                 layers.reverse()
                 self.optimiser.step(self.gradients)
                 if correct:
                     total_correct = total_correct + 1
+                # print(f"Time for image: {round(seconds_at_end_of_image - seconds_at_start_of_image, 5)}")
             average_loss = round(loss_total/len(training_images), 2)
             seconds_at_finish = time.time()
 
@@ -350,8 +548,8 @@ class Classification_Model():
 
 
 classifier = Classification_Model(layers)
-# classifier.train()
+classifier.train()
 # classifier.save_parameters()
-layers_with_params = classifier.load_parameters()
+# layers_with_params = classifier.load_parameters()
 print(classifier.accuracy_checK())
-# print(layers_with_params[0].bias)
+
