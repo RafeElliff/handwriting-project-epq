@@ -9,7 +9,7 @@ import pickle
 datasets, dataset_info = tensorflow_datasets.load(
     "emnist/byclass",
     split=["train[:5]", "test[:1000]"],
-    #Processing all of the data takes a fair bit of time. "m choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
+    #Processing all of the data takes a fair bit of time. I'm choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
     as_supervised=True,
     with_info=True)
 training_dataset = datasets[0]
@@ -157,6 +157,7 @@ class ReLU_Layer:
         dInput = dOutput * self.mask
         return dInput
 
+
 class CONV_Layer:
     def __init__(self, kernel_size, num_of_filters, stride, input_depth, input_width):
         self.kernel_size = kernel_size
@@ -180,91 +181,85 @@ class CONV_Layer:
                 "bias": bias
             }
 
+    def im2col(self, image): # get all_patches. image should be padded
+        height, width, depth = image.shape
+        num_patches = height - self.padding * 2
+
+        output_patches = []
+        for row in range (0, num_patches):
+            for column in range (0, num_patches):
+                patch = image[row: row+self.kernel_size, column: column+self.kernel_size, :].flatten() #each output here has size 3*3*input_depth
+                output_patches.append(patch)
+
+        numpy_array = numpy.array(output_patches)
+        transposed = numpy_array.transpose() #For matrix multiplication, it is important that it is 9*input_depth,784, not 784, 9*input_depth as the for loop makes it.
+
+        return transposed
+
+    def col2im(self, four_d_matrix):
+        padded_forward_pass = self.input
+        original_image = self.original_image
+        dInput_padded = numpy.zeros_like(padded_forward_pass)
+        height_orig, width_orig, depth_orig = original_image.shape
+        padding_px = self.padding
+        for row in range(0, height_orig ):
+            for column in range(0, width_orig ):
+                position_id = (row * height_orig + column)
+                dInput_padded[row: row+self.kernel_size, column: column+self.kernel_size, :] += four_d_matrix[:, :, :, position_id] # I dont normally use += as it generally makes code less readable imo but i think it makes it more readable here
+        dInput = dInput_padded[self.padding:-self.padding, self.padding:-self.padding, :]
+
+        return dInput
+
+    def full_weights_matrix(self):
+        full_weights_list = []
+        full_bias_list = []
+        for id, inner_dictionary in self.filters.items():
+            weight_for_id = inner_dictionary["weights"]
+            bias_for_id = inner_dictionary["bias"]
+            flattened_weights = weight_for_id.flatten()
+            full_weights_list.append(flattened_weights)
+            full_bias_list.append(bias_for_id)
+        weights_numpy = numpy.array(full_weights_list)
+        bias_vector = numpy.array(full_bias_list)
+        bias_matrix = bias_vector.reshape(self.num_of_filters, 1)
+        return weights_numpy, bias_matrix
+
     def forward_pass(self, image):
         padded = numpy.pad(image, ((self.padding, self.padding), (self.padding, self.padding), (0,0)), mode='constant')
         self.input = padded
         self.original_image = image
-        filters = self.filters
-        height, width, depth = padded.shape
-        padding_px = height - self.input_width
-        starting_pixel = 0 + padding_px//2
-        activation_map = {}
-        offset_size = (self.kernel_size - 1) // 2
-        num_of_scores = (height - padding_px) // self.stride
-        for filter in range (0, self.num_of_filters):
-            scores = numpy.zeros((num_of_scores, num_of_scores))
-            weights = filters[filter]["weights"]
-            bias = filters[filter]["bias"]
-            output_row = -1
-            for row in range(starting_pixel, starting_pixel + self.input_width, self.stride):
-                output_row = output_row + 1
-                output_column = -1
-                for column in range(starting_pixel, starting_pixel + self.input_width, self.stride):
-                    output_column = output_column + 1
-                    pixels_to_check = padded[row-offset_size: row+offset_size+1, column-offset_size: column+offset_size+1, :]
-                    product = (weights * pixels_to_check)
-                    score = numpy.sum(product) + bias
-                    scores[output_row, output_column] = score
+        orig_height, orig_width, orig_depth = image.shape
+        patch_matrix = self.im2col(padded)
+        weights_matrix, bias_matrix = self.full_weights_matrix()
+        self.weights = weights_matrix
+        results = numpy.matmul(weights_matrix, patch_matrix) + bias_matrix
+        reshaped_results = results.reshape(self.num_of_filters, orig_height, orig_width,)
+        transposed_results = numpy.transpose(reshaped_results, (1, 2, 0))
 
-            activation_map[filter] = scores
-        scores_3d = numpy.zeros((height-padding_px, width-padding_px, self.num_of_filters))
-        for id in range(0, self.num_of_filters):
-            scores_3d[:, :, id] = activation_map[id]
-        return scores_3d
+        self.patch_matrix = patch_matrix
+        return transposed_results
 
     def backprop(self, dOutput):
-        dWeights = {}
-        dBias = {}
-        filters = self.filters
-        dInput = numpy.zeros_like(self.input)
-        for id, inner_dictionary in filters.items():
-            total_dWeight = 0
-            #Here, we want to get all 28*28 starting pixels, find dLoss/dWeights at this point, and then add it up.
-            padded = self.input
-            height, width, depth = padded.shape
-            padding_px = height - self.input_width
-            starting_pixel = 0 + padding_px // 2
-            offset_size = (self.kernel_size - 1)//2
-            output_row = -1
-            for row in range (starting_pixel, starting_pixel+self.input_width, self.stride):
-                output_row = output_row + 1
-                output_column = -1
-                for column in range(starting_pixel, starting_pixel+self.input_width, self.stride):
-                    output_column = output_column + 1
-                    row_start = row - offset_size
-                    row_end = row + offset_size + 1
-                    column_start = column - offset_size
-                    column_end = column + offset_size + 1
-                    pixels_to_check = padded[row_start:row_end, column_start:column_end, :]
-                    grad = dOutput[output_row, output_column, id]
-                    dWeight = grad * pixels_to_check
-                    total_dWeight = total_dWeight + dWeight
-            dBias = numpy.sum(dOutput[:, :, id])
-
-            classifier.gradients[self.id][id]["weights"] = total_dWeight
-            classifier.gradients[self.id][id]["bias"] = dBias
-
-
-
-
-            gradient_filter = dOutput[:, :, id]
-            height_gradients, width_gradients = gradient_filter.shape
-            weights_for_filter = inner_dictionary["weights"]
-            rotated_weights = numpy.rot90(weights_for_filter, 2)
-            step_size = self.stride
-            for grad_row in range (0, height_gradients):
-                for grad_column in range (0, width_gradients):
-                    input_row = starting_pixel + (grad_row * step_size)
-                    input_column = starting_pixel +(grad_column * step_size)
-                    grad_value = gradient_filter[grad_row, grad_column]
-                    row_start = input_row - offset_size
-                    row_end = input_row+ offset_size + 1
-                    column_start = input_column - offset_size
-                    column_end = input_column + offset_size + 1
-                    dInput[row_start: row_end, column_start:column_end] = dInput[row_start:row_end, column_start:column_end] + grad_value * rotated_weights
-        dInput = dInput[self.padding: -self.padding, self.padding: -self.padding, :]
-
+        weights = self.weights
+        dBias = []
+        for id in range(0, self.num_of_filters):
+            dBias.append(numpy.sum(dOutput[:, :, id]))
+        dBias = numpy.array(dBias)
+        dOutput_Transposed = numpy.transpose(dOutput, (2, 0, 1))
+        dOutput_reshaped = numpy.reshape(dOutput_Transposed, (self.num_of_filters, 784))
+        patch_matrix = self.patch_matrix
+        transposed_patch_matrix = patch_matrix.transpose()
+        dWeights = numpy.matmul(dOutput_reshaped, transposed_patch_matrix)
+        input_to_col2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
+        input_to_col2im = numpy.reshape(input_to_col2im_reshaped, (self.kernel_size, self.kernel_size, self.input_depth, 784))
+        classifier.gradients[self.id] = {
+            "weights": dWeights,
+            "bias": dBias
+        }
+        dInput = self.col2im(input_to_col2im)
         return dInput
+
+
 
 class Flatten_Layer:
     def __init__(self):
@@ -304,30 +299,17 @@ class Adam_Optimiser:
                     "bias": numpy.zeros_like(layer.bias)
                 }
             elif layer.type == "CONV_Layer":
-                self.m[layer.id] = {}
-                self.v[layer.id] = {}
-                for filter in range(0, layer.num_of_filters):
-                    self.m[layer.id][filter] = {
-                        "weights": numpy.zeros_like(layer.filters[filter]["weights"]),
-                        "bias": 0
-                    }
-                    self.v[layer.id][filter] = {
-                        "weights": numpy.zeros_like(layer.filters[filter]["weights"]),
-                        "bias": 0
-                    }
-        # for layer in layers:
-        #     if layer.type == "CONV_Layer":
-        #         self.gradients[layer.id] = {}
-        #         for filter_id in range(layer.num_of_filters):
-        #             self.gradients[layer.id][filter_id] = {
-        #                 "weights": None,
-        #                 "bias": None
-        #             }
-        #     else:
-        #         self.gradients[layer.id] = {
-        #             "weights": None,
-        #             "bias": None
-        #         }
+                weights_matrix, bias_matrix = layer.full_weights_matrix()
+                bias_vector = bias_matrix.flatten()
+                self.m[layer.id] = {
+                    "weights": numpy.zeros_like(weights_matrix),
+                    "bias": numpy.zeros_like(bias_vector)
+                }
+                self.v[layer.id] = {
+                    "weights": numpy.zeros_like(weights_matrix),
+                    "bias": numpy.zeros_like(bias_vector)
+                }
+
 
 
     def step(self, gradients):
@@ -358,35 +340,41 @@ class Adam_Optimiser:
                 self.m[layer.id]["bias"] = m_bias
                 self.v[layer.id]["bias"] = v_bias
 
-
             elif layer.type == "CONV_Layer":
-                for filter in range(0, layer.num_of_filters):
-                    m_weights = self.m[layer.id][filter]["weights"]
-                    m_bias = self.m[layer.id][filter]["bias"]
-                    v_weights = self.v[layer.id][filter]["weights"]
-                    v_bias = self.v[layer.id][filter]["bias"]
-                    dWeights = gradients[layer.id][filter]["weights"]
-                    dBias = gradients[layer.id][filter]["bias"]
+                dWeights = gradients[layer.id]["weights"]
+                dBias = gradients[layer.id]["bias"]
 
-                    m_weights = self.beta1 * m_weights + (1 - self.beta1) * dWeights
-                    v_weights = self.beta2 * v_weights + (1 - self.beta2) * (dWeights ** 2)
-                    m_weights_protected = m_weights / (1 - self.beta1 ** self.timestep)
-                    v_weights_protected = v_weights / (1 - self.beta2 ** self.timestep)
-                    layer.filters[filter]["weights"] = layer.filters[filter]["weights"] - (self.learning_rate * m_weights_protected) / ( numpy.sqrt(v_weights_protected) + self.eps)
-                    self.m[layer.id][filter]["weights"] = m_weights
-                    self.v[layer.id][filter]["weights"] = v_weights
+                m_weights = self.m[layer.id]["weights"]
+                m_bias = self.m[layer.id]["bias"]
+                v_weights = self.v[layer.id]["weights"]
+                v_bias = self.v[layer.id]["bias"]
 
-                    m_bias = self.beta1 * m_bias + (1 - self.beta1) * dBias
-                    v_bias = self.beta2 * v_bias + (1 - self.beta2) * (dBias ** 2)
-                    m_bias_protected = m_bias / (1 - self.beta1 ** self.timestep)
-                    v_bias_protected = v_bias / (1 - self.beta2 ** self.timestep)
-                    change = (self.learning_rate * m_bias_protected) / (numpy.sqrt(v_bias_protected) + self.eps)
-                    layer.filters[filter]["bias"] = layer.filters[filter]["bias"] - change
+                m_weights = self.beta1 * m_weights + (1 - self.beta1) * dWeights
+                v_weights = self.beta2 * v_weights + (1 - self.beta2) * (dWeights ** 2)
+                m_weights_protected = m_weights / (1 - self.beta1 ** self.timestep)
+                v_weights_protected = v_weights / (1 - self.beta2 ** self.timestep)
 
-                    self.m[layer.id][filter]["bias"] = m_bias
-                    self.v[layer.id][filter]["bias"] = v_bias
+                weight_updates = - (self.learning_rate * m_weights_protected) / (numpy.sqrt(v_weights_protected) + self.eps)
 
+                for filter_id in range(0, layer.num_of_filters):
+                    weight_update_for_filter = weight_updates[filter_id].reshape(layer.kernel_size, layer.kernel_size, layer.input_depth)
+                    layer.filters[filter_id]["weights"] = layer.filters[filter_id]["weights"] + weight_update_for_filter
 
+                self.m[layer.id]["weights"] = m_weights
+                self.v[layer.id]["weights"] = v_weights
+
+                m_bias = self.beta1 * m_bias + (1 - self.beta1) * dBias
+                v_bias = self.beta2 * v_bias + (1 - self.beta2) * (dBias ** 2)
+                m_bias_protected = m_bias / (1 - self.beta1 ** self.timestep)
+                v_bias_protected = v_bias / (1 - self.beta2 ** self.timestep)
+
+                bias_updates = - (self.learning_rate * m_bias_protected) / (numpy.sqrt(v_bias_protected) + self.eps)
+
+                for filter_id in range(0, layer.num_of_filters):
+                    layer.filters[filter_id]["bias"] = layer.filters[filter_id]["bias"] + bias_updates[filter_id]
+
+                self.m[layer.id]["bias"] = m_bias
+                self.v[layer.id]["bias"] = v_bias
 def SVM_loss(answers, ground_truth):
     correct_score = answers[ground_truth]
     total_loss = 0
@@ -474,9 +462,9 @@ class Classification_Model():
                 forward = initial_image
                 for layer in layers:
                     forward = layer.forward_pass(forward)
-                print(f"Forward for image {index} done")
+                # print(f"Forward for image {index} done")
                 seconds_after_forward = time.time()
-                print(f"time for forward = {seconds_after_forward - seconds_at_start_of_image}")
+                # print(f"time for forward = {seconds_after_forward - seconds_at_start_of_image}")
                 loss, dLoss, correct = SVM_loss(forward, ground_truth)
                 loss_total = loss_total + loss
 
@@ -484,9 +472,9 @@ class Classification_Model():
                 layers.reverse()
                 for layer in layers:
                     backward = layer.backprop(backward)
-                print(f"Backprop for image {index} done")
+                # print(f"Backprop for image {index} done")
                 seconds_after_backward = time.time()
-                print(f"time for backward = {seconds_after_backward-seconds_after_forward}")
+                # print(f"time for backward = {seconds_after_backward-seconds_after_forward}")
                 layers.reverse()
                 self.optimiser.step(self.gradients)
                 if correct:
