@@ -8,7 +8,7 @@ import pickle
 
 datasets, dataset_info = tensorflow_datasets.load(
     "emnist/byclass",
-    split=["train[:1000]", "test[:1000]"],
+    split=["train[:5]", "test[:1000]"],
     #Processing all of the data takes a fair bit of time. "m choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
     as_supervised=True,
     with_info=True)
@@ -173,7 +173,7 @@ class CONV_Layer:
         self.filters = {}
         num_of_filters = self.num_of_filters
         for filter in range (0, num_of_filters):
-            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth) * math.sqrt(2//self.num_of_filters)
+            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth) * math.sqrt(2/self.num_of_filters)
             bias = 0
             self.filters[filter] = {
                 "weights": weights,
