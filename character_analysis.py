@@ -1,4 +1,3 @@
-
 import tensorflow_datasets
 import numpy
 import math
@@ -6,14 +5,11 @@ import time
 import pickle
 
 
-datasets, dataset_info = tensorflow_datasets.load(
-    "emnist/byclass",
-    split=["train[:5]", "test[:1000]"],
-    #Processing all of the data takes a fair bit of time. I'm choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
-    as_supervised=True,
-    with_info=True)
-training_dataset = datasets[0]
-testing_dataset = datasets[1]
+def scale_array_to_0_to_1(numpy_array):
+    scaled = numpy.divide(numpy_array, 255)
+    scaled_reshaped = numpy.reshape(scaled, (28, 28))
+    return scaled_reshaped
+
 id_to_letters = {
     0: "0",
     1: "1",
@@ -78,39 +74,50 @@ id_to_letters = {
     60: "y",
     61: "z",
 }
-images = []
-labels = []
-counter = 0
-training_images = []
-training_labels = []
-testing_images = []
-testing_labels = []
-def scale_array_to_0_to_1(numpy_array):
-    scaled = numpy.divide(numpy_array, 255)
-    scaled_reshaped = numpy.reshape(scaled, (28, 28))
-    return scaled_reshaped
+def load_dataset(dataset_type, starting_index, finishing_index):
+    if dataset_type == "train":
+        training_dataset, dataset_info = tensorflow_datasets.load(
+            "emnist/bymerge",
+            split=f"train[{starting_index}:{finishing_index}]", # Processing all of the data takes a fair bit of time. I'm choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
+            as_supervised=True,
+            with_info=True)
+        training_images = []
+        training_labels = []
+        for image, label in training_dataset:
+            image = numpy.array(image)
+            scaled = scale_array_to_0_to_1(image)
+            transposed = numpy.transpose(scaled)
+            reshaped = numpy.reshape(transposed, (28, 28, 1))
+            training_images.append(reshaped)
+            training_labels.append(numpy.array(label))
+        images_matrix = numpy.stack(training_images)
+        labels_matrix = numpy.stack(training_labels)
+        return images_matrix, labels_matrix
 
-for image, label in training_dataset:
+    elif dataset_type == "test":
+        testing_dataset, dataset_info = tensorflow_datasets.load(
+            "emnist/bymerge",
+            split=f"test[{starting_index}:{finishing_index}]",
+            as_supervised=True,
+            with_info=True)
+        testing_images = []
+        testing_labels = []
+        for image, label in testing_dataset:
+            image = numpy.array(image)
+            scaled = scale_array_to_0_to_1(image)
+            transposed = numpy.transpose(scaled)
+            reshaped = numpy.reshape(transposed, (28, 28, 1))
+            testing_images.append(reshaped)
+            testing_labels.append(numpy.array(label))
 
-    image = numpy.array(image)
-    scaled = scale_array_to_0_to_1(image)
-    transposed = numpy.transpose(scaled)
-    reshaped = numpy.reshape(transposed, (28, 28, 1))
-    # flattened = transposed.flatten()
-    training_images.append(reshaped)
-    training_labels.append(numpy.array(label))
-
-for image, label in testing_dataset:
-    image = numpy.array(image)
-    scaled = scale_array_to_0_to_1(image)
-    transposed = numpy.transpose(scaled)
-    reshaped = numpy.reshape(transposed, (28, 28, 1))
-    # flattened = transposed.flatten()
-    testing_images.append(reshaped)
-    testing_labels.append(numpy.array(label))
+        images_matrix = numpy.stack(testing_images)
+        labels_matrix = numpy.stack(testing_labels)
+        return images_matrix, labels_matrix
 
 
-print("Image preparation done")
+
+
+
 
 
 class Linear_Layer:
@@ -130,8 +137,8 @@ class Linear_Layer:
         return output
     def backprop(self, dOutput):
         dInput = numpy.matmul(dOutput, numpy.transpose(self.weights))
-        dWeights = numpy.outer(self.input, dOutput)
-        dBias = dOutput
+        dWeights = numpy.matmul(numpy.transpose(self.input), dOutput) / dOutput.shape[0]
+        dBias = numpy.sum(dOutput, axis=0)
         classifier.gradients[self.id]["weights"] = dWeights
         classifier.gradients[self.id]["bias"] = dBias
         return dInput
@@ -181,32 +188,35 @@ class CONV_Layer:
                 "bias": bias
             }
 
-    def im2col(self, image): # get all_patches. image should be padded
-        height, width, depth = image.shape
+    def im2col(self, images_batch): # get all_patches. image should be padded
+        batch_size, height, width, depth = images_batch.shape
         num_patches = height - self.padding * 2
 
         output_patches = []
-        for row in range (0, num_patches):
-            for column in range (0, num_patches):
-                patch = image[row: row+self.kernel_size, column: column+self.kernel_size, :].flatten() #each output here has size 3*3*input_depth
-                output_patches.append(patch)
+        for image_index in range(0, batch_size):
+            image = images_batch[image_index]
+            for row in range (0, num_patches):
+                for column in range (0, num_patches):
+                    patch = image[row: row+self.kernel_size, column: column+self.kernel_size, :].flatten() #each output here has size 3*3*input_depth
+                    output_patches.append(patch)
 
-        numpy_array = numpy.array(output_patches)
+        numpy_array = numpy.stack(output_patches)
         transposed = numpy_array.transpose() #For matrix multiplication, it is important that it is 9*input_depth,784, not 784, 9*input_depth as the for loop makes it.
 
         return transposed
 
     def col2im(self, four_d_matrix):
         padded_forward_pass = self.input
-        original_image = self.original_image
+        original_image = self.original_images
         dInput_padded = numpy.zeros_like(padded_forward_pass)
-        height_orig, width_orig, depth_orig = original_image.shape
-        padding_px = self.padding
-        for row in range(0, height_orig ):
-            for column in range(0, width_orig ):
-                position_id = (row * height_orig + column)
-                dInput_padded[row: row+self.kernel_size, column: column+self.kernel_size, :] += four_d_matrix[:, :, :, position_id] # I dont normally use += as it generally makes code less readable imo but i think it makes it more readable here
-        dInput = dInput_padded[self.padding:-self.padding, self.padding:-self.padding, :]
+        batch_size, height_orig, width_orig, depth_orig = original_image.shape
+        patch_id = -1
+        for image_id in range(0, batch_size):
+            for row in range(0, height_orig):
+                for column in range(0, width_orig):
+                    patch_id = patch_id +1
+                    dInput_padded[image_id, row: row+self.kernel_size, column: column+self.kernel_size, :] += four_d_matrix[:, :, :, patch_id] # I dont normally use += as it generally makes code less readable imo but i think it makes it more readable here
+        dInput = dInput_padded[:, self.padding:-self.padding, self.padding:-self.padding, :]
 
         return dInput
 
@@ -224,34 +234,38 @@ class CONV_Layer:
         bias_matrix = bias_vector.reshape(self.num_of_filters, 1)
         return weights_numpy, bias_matrix
 
-    def forward_pass(self, image):
-        padded = numpy.pad(image, ((self.padding, self.padding), (self.padding, self.padding), (0,0)), mode='constant')
+    def forward_pass(self, images_batch):
+        batch_size, orig_height, orig_width, orig_depth = images_batch.shape
+        self.batch_size = batch_size
+        padded = numpy.pad(images_batch, ((0, 0),(self.padding, self.padding), (self.padding, self.padding), (0,0)), mode='constant')
         self.input = padded
-        self.original_image = image
-        orig_height, orig_width, orig_depth = image.shape
+        self.original_images = images_batch
+        batch_size, orig_height, orig_width, orig_depth= images_batch.shape
         patch_matrix = self.im2col(padded)
         weights_matrix, bias_matrix = self.full_weights_matrix()
         self.weights = weights_matrix
         results = numpy.matmul(weights_matrix, patch_matrix) + bias_matrix
-        reshaped_results = results.reshape(self.num_of_filters, orig_height, orig_width,)
-        transposed_results = numpy.transpose(reshaped_results, (1, 2, 0))
+        reshaped_results = results.reshape(self.num_of_filters, batch_size, orig_height, orig_width,)
+        transposed_results = numpy.transpose(reshaped_results, (1, 2, 3, 0))
 
         self.patch_matrix = patch_matrix
         return transposed_results
 
     def backprop(self, dOutput):
         weights = self.weights
+        batch_size, height, width, depth = dOutput.shape
         dBias = []
         for id in range(0, self.num_of_filters):
-            dBias.append(numpy.sum(dOutput[:, :, id]))
+            dBias.append(numpy.sum(dOutput[:, :, :, id], axis = (0,1,2)))
         dBias = numpy.array(dBias)
-        dOutput_Transposed = numpy.transpose(dOutput, (2, 0, 1))
-        dOutput_reshaped = numpy.reshape(dOutput_Transposed, (self.num_of_filters, 784))
+        dOutput_Transposed = numpy.transpose(dOutput, (3, 0, 1, 2))
+        dOutput_reshaped = numpy.reshape(dOutput_Transposed, (self.num_of_filters, -1))
         patch_matrix = self.patch_matrix
         transposed_patch_matrix = patch_matrix.transpose()
-        dWeights = numpy.matmul(dOutput_reshaped, transposed_patch_matrix)
+        dWeights = numpy.matmul(dOutput_reshaped, transposed_patch_matrix) / batch_size
         input_to_col2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
-        input_to_col2im = numpy.reshape(input_to_col2im_reshaped, (self.kernel_size, self.kernel_size, self.input_depth, 784))
+        total_patches = height * width * batch_size
+        input_to_col2im = input_to_col2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
         classifier.gradients[self.id] = {
             "weights": dWeights,
             "bias": dBias
@@ -268,7 +282,7 @@ class Flatten_Layer:
         self.type = "Flatten_Layer"
     def forward_pass(self, input):
         self.input_shape = input.shape
-        flattened = input.flatten()
+        flattened = input.reshape(input.shape[0], -1)
         return flattened
 
     def backprop(self, dOutput_flat):
@@ -375,7 +389,7 @@ class Adam_Optimiser:
 
                 self.m[layer.id]["bias"] = m_bias
                 self.v[layer.id]["bias"] = v_bias
-def SVM_loss(answers, ground_truth):
+def SVM_loss_single_image(answers, ground_truth):
     correct_score = answers[ground_truth]
     total_loss = 0
     margin = 1
@@ -398,6 +412,25 @@ def SVM_loss(answers, ground_truth):
 
     return total_loss, dLoss, correct
 
+def batched_SVM(answers_batch, ground_truths_batch): #Answers has shape (batch_size, 62). ground_truth has shape (batch_size)
+    total_loss = 0
+    all_dLoss = []
+    total_correct = 0
+    batch_size = len(answers_batch)
+    for image in range (0, batch_size):
+        answers = answers_batch[image]
+        ground_truth = ground_truths_batch[image]
+        loss, dLoss, correct = SVM_loss_single_image(answers, ground_truth)
+        total_loss = total_loss + loss
+        all_dLoss.append(dLoss)
+        if correct:
+            total_correct = total_correct + 1
+
+    average_loss = total_loss/batch_size
+    all_dLoss_matrix = numpy.stack(all_dLoss)
+    return average_loss, all_dLoss_matrix, total_correct
+
+
 
 layer_ids = [-1] #-1 does not correspond to a layer, it is just to avoid error handling
 
@@ -407,7 +440,7 @@ layer_2 = CONV_Layer(3, 64, 1, 32, 28)
 layer_3 = ReLU_Layer()  #dOutput = 28*28*64
 layer_4 = CONV_Layer(3, 128, 1, 64, 28)#dOutput = 28*28*128
 layer_5 = Flatten_Layer() #dOutput = 100352
-layer_6 = Linear_Layer(28*28*128, 62) #dOutput = 62
+layer_6 = Linear_Layer(28*28*128, 47) #dOutput = 62
 
 layers = [
     layer_0,
@@ -419,7 +452,9 @@ layers = [
     layer_6,
 ]
 
-class Classification_Model():
+
+
+class Classification_Model_NEW():
     def __init__(self, layers):
         self.optimiser = Adam_Optimiser(0.001, layers, 0.9, 0.999, 0.00000001)
         self.optimiser.zero_gradients(layers)
@@ -433,65 +468,54 @@ class Classification_Model():
         self.loss_best = 10 ** 5
         self.epoch_loss_best = -1
         self.gradients = {}
-        for epoch in range (0, 25):
+        for epoch in range (0, 15):
             time_tuple = time.localtime()
             time_at_start = str(time_tuple[3]) + ":" + str(time_tuple[4]) + ":" + str(time_tuple[5])
             seconds_at_start = time.time()
             print(f"time at start of epoch {epoch} = {time_at_start}")
-            loss_total = 0
             total_correct = 0
-            for index in range (0, len(training_images)):
-                seconds_at_start_of_image = time.time()
-                self.gradients = {}
+            seconds_at_stage_1 = time.time()
+            print(f"Seconds from start to stage 1: {seconds_at_stage_1-seconds_at_start}")
+            total_images = 5120
+            self.batch_size = 128
+            batch_size = self.batch_size
+            loss_total = 0
+            for batch_start in range (0, total_images, batch_size):
                 for layer in layers:
-                    if layer.type == "CONV_Layer":
-                        self.gradients[layer.id] = {}
-                        for filter in range(0, layer.num_of_filters):
-                            self.gradients[layer.id][filter] = {
-                                "weights": None,
-                                "bias": None
-                            }
-                    else:
+                    if layer.type == "Linear Layer":
                         self.gradients[layer.id] = {
                             "weights": None,
                             "bias": None
                         }
-
-                initial_image = training_images[index]
-                ground_truth = training_labels[index]
-                forward = initial_image
+                    elif layer.type == "CONV_Layer":
+                        self.gradients[layer.id] = {
+                            "weights": None,
+                            "bias": None
+                        }
+                training_images, training_labels = load_dataset("train", batch_start, batch_start+batch_size)
+                if (batch_start // batch_size) % 5 == 0:
+                    print(f"Epoch {epoch}, Batch Number {(batch_start//batch_size)} of {total_images//batch_size}:")
+                time_at_batch_start = time.time()
+                ground_truth = training_labels
+                forward = training_images
                 for layer in layers:
                     forward = layer.forward_pass(forward)
-                # print(f"Forward for image {index} done")
-                seconds_after_forward = time.time()
-                # print(f"time for forward = {seconds_after_forward - seconds_at_start_of_image}")
-                loss, dLoss, correct = SVM_loss(forward, ground_truth)
+                loss, dLoss, correct = batched_SVM(forward, ground_truth)
                 loss_total = loss_total + loss
-
+                total_correct = total_correct + correct
                 backward = dLoss
-                layers.reverse()
-                for layer in layers:
-                    backward = layer.backprop(backward)
-                # print(f"Backprop for image {index} done")
-                seconds_after_backward = time.time()
-                # print(f"time for backward = {seconds_after_backward-seconds_after_forward}")
-                layers.reverse()
+                for layer in reversed(layers):
+                     backward = layer.backprop(backward)
+
+                time_at_batch_end = time.time()
+                if (batch_start//batch_size) % 5 == 0:
+                    print(f"Time for Batch = {round(time_at_batch_end - time_at_batch_start, 5)}, time per image = {round(((time_at_batch_end - time_at_batch_start)/batch_size), 5)}")
+
                 self.optimiser.step(self.gradients)
-                if correct:
-                    total_correct = total_correct + 1
-                # print(f"Time for image: {round(seconds_at_end_of_image - seconds_at_start_of_image, 5)}")
-            average_loss = round(loss_total/len(training_images), 2)
-            seconds_at_finish = time.time()
 
-            average_correct = total_correct / len(training_images)
-            print(f"Epoch {epoch}, loss = {average_loss}, time to run = {round((seconds_at_finish-seconds_at_start), 2)}, accuracy % = {round(average_correct * 100, 5)}")
-            if average_loss < self.loss_best:
-                self.loss_best = average_loss
-                self.epoch_loss_best = epoch
-
-            if epoch - self.epoch_loss_best > 5:
-                break
-        print(f"Best epoch = {self.epoch_loss_best}, with loss {self.loss_best}")
+            average_loss = loss_total/(total_images)
+            print(f"Average Loss for epoch {epoch} = {average_loss}")
+            print(f"Accuracy for epoch {epoch} = {self.accuracy_check()}")
 
     def save_parameters(self):
         for layer in self.layers:
@@ -509,19 +533,23 @@ class Classification_Model():
         self.layers = layers_with_params
         return layers_with_params
 
-    def accuracy_checK(self):
-        print("Accuracy Check Started")
+    def accuracy_check(self):
+        # print("Accuracy Check Started")
         correct_counter = 0
+        testing_images, testing_labels = load_dataset("test", 0, 1000)
+        # print("Image Loading Done")
         for index in range (0, len(testing_images)):
+            # if index % 100 == 0:
+                # print(f"Testing Image {index}")
             image = testing_images[index]
             label = testing_labels[index]
-            forward = image
+            image_batched = numpy.expand_dims(image, axis=0)
+            forward = image_batched
             for layer in layers:
                 forward = layer.forward_pass(forward)
-            prediction = numpy.argmax(forward)
+            prediction = numpy.argmax(forward[0])
             if prediction == label:
                 correct_counter = correct_counter + 1
-        print("Accuracy Check ended")
         return round((correct_counter / len(testing_images) * 100), 2)
 
     def get_prediction(self, image):
@@ -535,9 +563,5 @@ class Classification_Model():
 
 
 
-classifier = Classification_Model(layers)
+classifier = Classification_Model_NEW(layers)
 classifier.train()
-# classifier.save_parameters()
-# layers_with_params = classifier.load_parameters()
-print(classifier.accuracy_checK())
-
