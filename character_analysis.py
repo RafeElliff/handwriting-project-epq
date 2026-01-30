@@ -1,14 +1,14 @@
+import os
+import random
 import tensorflow_datasets
 import numpy
 import math
 import time
 import pickle
+from helper_functions import scale_array_to_0_to_1
 
 
-def scale_array_to_0_to_1(numpy_array):
-    scaled = numpy.divide(numpy_array, 255)
-    scaled_reshaped = numpy.reshape(scaled, (28, 28))
-    return scaled_reshaped
+
 
 id_to_letters = {
     0: "0",
@@ -121,7 +121,7 @@ def load_dataset(dataset_type, starting_index, finishing_index):
 
 
 class Linear_Layer:
-    def __init__(self, num_of_inputs, num_of_neurons):
+    def __init__(self, num_of_inputs, num_of_neurons, classifier):
         self.num_of_inputs = num_of_inputs
         self.num_of_neurons = num_of_neurons
         weights = numpy.random.randn(num_of_inputs, num_of_neurons) * math.sqrt(2/num_of_inputs)
@@ -129,8 +129,8 @@ class Linear_Layer:
         self.bias = numpy.zeros(num_of_neurons)
         self.input = None
         self.type = "Linear Layer"
-        self.id = layer_ids[-1] + 1
-        layer_ids.append(self.id)
+        self.id = classifier.layer_ids[-1] + 1
+        classifier.layer_ids.append(self.id)
     def forward_pass(self, input):
         self.input = input
         output = numpy.matmul(input, self.weights) + self.bias
@@ -145,13 +145,13 @@ class Linear_Layer:
 
 
 class ReLU_Layer:
-    def __init__(self):
+    def __init__(self, classifier):
         self.input = None
         self.output = None
         self.type = "ReLU Layer"
-        self.id = layer_ids[-1] + 1
+        self.id = classifier.layer_ids[-1] + 1
         self.mask = None
-        layer_ids.append(self.id)
+        classifier.layer_ids.append(self.id)
 
     def forward_pass(self, input):
         self.input = input
@@ -166,15 +166,15 @@ class ReLU_Layer:
 
 
 class CONV_Layer:
-    def __init__(self, kernel_size, num_of_filters, stride, input_depth, input_width):
+    def __init__(self, kernel_size, num_of_filters, stride, input_depth, input_width, classifier):
         self.kernel_size = kernel_size
         self.num_of_filters = num_of_filters
         self.stride = stride
         self.padding = (kernel_size-1)//2
         self.input_depth = input_depth
         self.input_width = input_width
-        self.id = layer_ids[-1] + 1
-        layer_ids.append(self.id)
+        self.id = classifier.layer_ids[-1] + 1
+        classifier.layer_ids.append(self.id)
         self.type = "CONV_Layer"
         self.initialise_filter_weights()
     def initialise_filter_weights(self):
@@ -205,7 +205,7 @@ class CONV_Layer:
 
         return transposed
 
-    def col2im(self, four_d_matrix):
+    def coL2im(self, four_d_matrix):
         padded_forward_pass = self.input
         original_image = self.original_images
         dInput_padded = numpy.zeros_like(padded_forward_pass)
@@ -263,22 +263,22 @@ class CONV_Layer:
         patch_matrix = self.patch_matrix
         transposed_patch_matrix = patch_matrix.transpose()
         dWeights = numpy.matmul(dOutput_reshaped, transposed_patch_matrix) / batch_size
-        input_to_col2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
+        input_to_coL2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
         total_patches = height * width * batch_size
-        input_to_col2im = input_to_col2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
+        input_to_coL2im = input_to_coL2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
         classifier.gradients[self.id] = {
             "weights": dWeights,
             "bias": dBias
         }
-        dInput = self.col2im(input_to_col2im)
+        dInput = self.coL2im(input_to_coL2im)
         return dInput
 
 
 
 class Flatten_Layer:
-    def __init__(self):
-        self.id = layer_ids[-1] + 1
-        layer_ids.append(self.id)
+    def __init__(self, classifier):
+        self.id = classifier.layer_ids[-1] + 1
+        classifier.layer_ids.append(self.id)
         self.type = "Flatten_Layer"
     def forward_pass(self, input):
         self.input_shape = input.shape
@@ -288,6 +288,56 @@ class Flatten_Layer:
     def backprop(self, dOutput_flat):
         dOutput_3d = numpy.reshape(dOutput_flat, self.input_shape)
         return dOutput_3d
+
+def get_random_hyperparams():
+    LR_LB = 0.0003 #lower bound/upper bound
+    LR_UB = 0.003
+    default_LR = 0.001
+    LR_range_test = True #Set this to true if you want to be checking the LR range.
+    batch_size_LB = 32
+    batch_size_UB = 256
+    default_batch_size = 128
+    batch_size_test = True
+    L2_LB = 0.01
+    L2_UB = 0.1
+    default_L2 = 0.01
+    L2_range_test = True
+    possible_filter_sizes = [(16, 32, 64), (32, 48, 64), (32, 64, 128)]
+    default_filter_sizes = (32, 64, 128)
+    filter_size_test = True
+    #Here, the first number per tuple is the type of decay. 0 = no decay, 1 = linear, 2 = exponential. The second number is the rate (where applicable), and the third is the step size (where applicable)
+    learning_rate_decay_options = [(0, 0, 0), (1, 0.95, 5), (1, 0.9, 5), (1, 0.8, 5), (2, 0.96, 0), (2, 0.93, 0), (2, 0.9, 0) ]
+    LR_decay_test = False
+    LR_decay_default = learning_rate_decay_options[0]
+    random_LR = random.uniform(LR_LB, LR_UB)
+    random_L2 = random.uniform(L2_LB, L2_UB)
+    random_batch_size = random.randint(batch_size_LB,batch_size_UB)
+    random_filter_size = random.choice(possible_filter_sizes)
+    random_LR_decay = random.choice(learning_rate_decay_options)
+
+    if L2_range_test:
+        final_L2 = random_L2
+    else:
+        final_L2 = default_L2
+    if LR_range_test:
+        final_LR = random_LR
+    else:
+        final_LR = default_LR
+    if batch_size_test:
+        final_batch_size = random_batch_size
+    else:
+        final_batch_size = default_batch_size
+    if filter_size_test:
+        final_filter_size = random_filter_size
+    else:
+        final_filter_size = default_filter_sizes
+    if LR_decay_test:
+        final_LR_decay = random_LR_decay
+    else:
+        final_LR_decay = LR_decay_default
+
+    return final_LR, final_batch_size, final_L2, final_filter_size, final_LR_decay
+
 
 class Adam_Optimiser:
     def __init__(self, learning_rate, layers, beta1, beta2, eps):
@@ -431,57 +481,71 @@ def batched_SVM(answers_batch, ground_truths_batch): #Answers has shape (batch_s
     return average_loss, all_dLoss_matrix, total_correct
 
 
+def LR_decay(LR_decay_hyperparam, initial_LR, epoch):
+    type_of_decay = LR_decay_hyperparam[0]
+    rate_of_decay = LR_decay_hyperparam[1]
+    step_size_of_decay = LR_decay_hyperparam[2]
+    if type_of_decay == 0: #No LR
+        return initial_LR
+    if type_of_decay == 1: #Linear Decay
+        return initial_LR * rate_of_decay ** (epoch/step_size_of_decay)
+    if type_of_decay == 2: #Exponential Decay
+        return initial_LR * math.e ** -(rate_of_decay * epoch)
 
-layer_ids = [-1] #-1 does not correspond to a layer, it is just to avoid error handling
-
-layer_0 = CONV_Layer(3, 32, 1, 1, 28)
-layer_1 = ReLU_Layer()
-layer_2 = CONV_Layer(3, 64, 1, 32, 28)
-layer_3 = ReLU_Layer()  #dOutput = 28*28*64
-layer_4 = CONV_Layer(3, 128, 1, 64, 28)#dOutput = 28*28*128
-layer_5 = Flatten_Layer() #dOutput = 100352
-layer_6 = Linear_Layer(28*28*128, 47) #dOutput = 62
-
-layers = [
-    layer_0,
-    layer_1,
-    layer_2,
-    layer_3,
-    layer_4,
-    layer_5,
-    layer_6,
-]
-
-
-
+def write_new_line_to_file(filename, line):
+    filepath_source = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\training data runs"
+    filepath = os.path.join(filepath_source, filename)
+    with open(filepath, "a") as file:
+        file.write(line + "\n")
 class Classification_Model_NEW():
-    def __init__(self, layers):
-        self.optimiser = Adam_Optimiser(0.001, layers, 0.9, 0.999, 0.00000001)
-        self.optimiser.zero_gradients(layers)
-        self.loss_best = 10 ** 5
-        self.epoch_loss_best = -1
-        self.gradients = {}
+    def __init__(self):
+        hyperparams = get_random_hyperparams()
+        print(hyperparams)
+        write_new_line_to_file("night of 28-1", f"LR = {hyperparams[0]}, batch_size = {hyperparams[1]}, L2_strength = {hyperparams[2]}, filter_sizes = {hyperparams[3]}, LR decay = {hyperparams[4]}")
+        self.hyperparams = hyperparams
+        self.layer_ids = [-1]  # -1 does not correspond to a layer, it is just to avoid error handling
+        layer_0 = CONV_Layer(3, hyperparams[3][0], 1, 1, 28, self)
+        layer_1 = ReLU_Layer(self)
+        layer_2 = CONV_Layer(3, hyperparams[3][1], 1, hyperparams[3][0], 28, self)
+        layer_3 = ReLU_Layer(self)  # dOutput = 28*28*64
+        layer_4 = CONV_Layer(3, hyperparams[3][2], 1, hyperparams[3][1], 28, self)  # dOutput = 28*28*128
+        layer_5 = Flatten_Layer(self)  # dOutput = 100352
+        layer_6 = Linear_Layer(28 * 28 * hyperparams[3][2], 47, self)  # dOutput = 62
+
+        layers = [
+            layer_0,
+            layer_1,
+            layer_2,
+            layer_3,
+            layer_4,
+            layer_5,
+            layer_6,
+        ]
         self.layers = layers
-    def train(self):
-        self.optimiser = Adam_Optimiser(0.001, layers, 0.9, 0.999, 0.00000001)
+        self.L2_lambda = hyperparams[2]
+        self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 0.00000001)
         self.optimiser.zero_gradients(layers)
-        self.loss_best = 10 ** 5
-        self.epoch_loss_best = -1
+        self.best_accuracy = 0
+        self.epoch_with_best_accuracy = -1
         self.gradients = {}
-        for epoch in range (0, 15):
+
+    def train(self):
+        self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 0.00000001)
+        self.optimiser.zero_gradients(self.layers)
+        self.gradients = {}
+        for epoch in range (0, 4):
+            self.decayed_LR = LR_decay(self.hyperparams[4], self.hyperparams[0], epoch)
+            self.optimiser.learning_rate = self.decayed_LR
             time_tuple = time.localtime()
             time_at_start = str(time_tuple[3]) + ":" + str(time_tuple[4]) + ":" + str(time_tuple[5])
-            seconds_at_start = time.time()
             print(f"time at start of epoch {epoch} = {time_at_start}")
             total_correct = 0
-            seconds_at_stage_1 = time.time()
-            print(f"Seconds from start to stage 1: {seconds_at_stage_1-seconds_at_start}")
-            total_images = 5120
-            self.batch_size = 128
+            total_images = 512
+            self.batch_size = self.hyperparams[1]
             batch_size = self.batch_size
             loss_total = 0
             for batch_start in range (0, total_images, batch_size):
-                for layer in layers:
+                for layer in self.layers:
                     if layer.type == "Linear Layer":
                         self.gradients[layer.id] = {
                             "weights": None,
@@ -492,30 +556,57 @@ class Classification_Model_NEW():
                             "weights": None,
                             "bias": None
                         }
+                time_before_loading_data = time.time()
                 training_images, training_labels = load_dataset("train", batch_start, batch_start+batch_size)
-                if (batch_start // batch_size) % 5 == 0:
+                time_after_loading_data = time.time()
+                print(time_after_loading_data-time_before_loading_data)
+                if (batch_start // batch_size) % 50 == 0:
                     print(f"Epoch {epoch}, Batch Number {(batch_start//batch_size)} of {total_images//batch_size}:")
                 time_at_batch_start = time.time()
                 ground_truth = training_labels
                 forward = training_images
-                for layer in layers:
+                for layer in self.layers:
                     forward = layer.forward_pass(forward)
                 loss, dLoss, correct = batched_SVM(forward, ground_truth)
-                loss_total = loss_total + loss
+
+                L2_loss = 0
+                for layer in self.layers:
+                    if layer.type == "Linear Layer":
+                        L2_loss = L2_loss + numpy.sum(layer.weights ** 2)
+                    elif layer.type == "CONV_Layer":
+                        for filter_id in layer.filters:
+                            weights = layer.filters[filter_id]["weights"]
+                            L2_loss = L2_loss + numpy.sum(weights ** 2)
+                L2_loss = (self.L2_lambda / 2) * L2_loss
+                loss_total = loss_total + loss + L2_loss
                 total_correct = total_correct + correct
                 backward = dLoss
-                for layer in reversed(layers):
+                for layer in reversed(self.layers):
                      backward = layer.backprop(backward)
 
+                for layer in self.layers:
+                    if layer.type == "Linear Layer":
+                        self.gradients[layer.id]["weights"] += self.L2_lambda * layer.weights
+                    elif layer.type == "CONV_Layer":
+                        weights_matrix, bias_matrix = layer.full_weights_matrix()
+                        self.gradients[layer.id]["weights"] += self.L2_lambda * weights_matrix
+
                 time_at_batch_end = time.time()
-                if (batch_start//batch_size) % 5 == 0:
+                if (batch_start//batch_size) % 50 == 0:
                     print(f"Time for Batch = {round(time_at_batch_end - time_at_batch_start, 5)}, time per image = {round(((time_at_batch_end - time_at_batch_start)/batch_size), 5)}")
 
                 self.optimiser.step(self.gradients)
 
-            average_loss = loss_total/(total_images)
-            print(f"Average Loss for epoch {epoch} = {average_loss}")
-            print(f"Accuracy for epoch {epoch} = {self.accuracy_check()}")
+            # average_loss = loss_total/(total_images)
+            # accuracy = self.accuracy_check()
+            # if accuracy > self.best_accuracy:
+            #     self.best_accuracy = accuracy
+            #     self.epoch_with_best_accuracy = epoch
+            # print(f"Average Loss for epoch {epoch} = {average_loss}")
+            # string_to_store = f"Accuracy for epoch {epoch} = {accuracy}"
+
+        string_to_store = f"Accuracy on epoch 3 = {self.accuracy_check()}"
+        write_new_line_to_file("night of 28-1", string_to_store)
 
     def save_parameters(self):
         for layer in self.layers:
@@ -525,7 +616,7 @@ class Classification_Model_NEW():
 
     def load_parameters(self):
         layers_with_params = []
-        for layer in layers:
+        for layer in self.layers:
             filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
             with open(filename, "rb") as file:
                 layer = pickle.load(file)
@@ -545,7 +636,7 @@ class Classification_Model_NEW():
             label = testing_labels[index]
             image_batched = numpy.expand_dims(image, axis=0)
             forward = image_batched
-            for layer in layers:
+            for layer in self.layers:
                 forward = layer.forward_pass(forward)
             prediction = numpy.argmax(forward[0])
             if prediction == label:
@@ -554,14 +645,19 @@ class Classification_Model_NEW():
 
     def get_prediction(self, image):
         forward = image
-        for layer in layers:
+        for layer in self.layers:
             forward = layer.forward_pass(forward)
         prediction = numpy.argmax(forward)
         certainty = numpy.argmax(forward) #THIS CODE ISN'T FINISHED YET
         return prediction, certainty
 
 
+for hyperparam_set in range(0, 25):
+    string_to_store = (f"Hyperparam set {hyperparam_set}")
+    write_new_line_to_file("night of 28-1", string_to_store)
+    classifier = Classification_Model_NEW()
+    classifier.train()
 
 
-classifier = Classification_Model_NEW(layers)
-classifier.train()
+
+

@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy
+from helper_functions import resize_to_28_x_28
 
 images_prepared_npy  = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_npy"
 images_prepared_jpg  = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_jpg"
@@ -286,11 +287,7 @@ def get_npy_images(components, npy_filename, numpy_array):
     return components, resized_list, npy_filename
 
 
-def resize_to_28_x_28(numpy_array):
-    resized = cv2.resize(numpy_array, (24, 24), interpolation= cv2.INTER_LINEAR)
-    padded = numpy.pad(resized, 2, mode='constant')
-    print(padded)
-    return padded
+
 
 
 numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
