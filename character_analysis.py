@@ -6,114 +6,182 @@ import math
 import time
 import pickle
 from helper_functions import scale_array_to_0_to_1
+from load_images import get_EMNIST_images, get_maths_images, get_full_set
+base_training_data = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\training data runs"
+import json
 
-
-
-
-id_to_letters = {
-    0: "0",
-    1: "1",
-    2: "2",
-    3: "3",
-    4: "4",
-    5: "5",
-    6: "6",
-    7: "7",
-    8: "8",
-    9: "9",
-    10: "A",
-    11: "B",
-    12: "C",
-    13: "D",
-    14: "E",
-    15: "F",
-    16: "G",
-    17: "H",
-    18: "I",
-    19: "J",
-    20: "K",
-    21: "L",
-    22: "M",
-    23: "N",
-    24: "O",
-    25: "P",
-    26: "Q",
-    27: "R",
-    28: "S",
-    29: "T",
-    30: "U",
-    31: "V",
-    32: "W",
-    33: "X",
-    34: "Y",
-    35: "Z",
-    36: "a",
-    37: "b",
-    38: "c",
-    39: "d",
-    40: "e",
-    41: "f",
-    42: "g",
-    43: "h",
-    44: "i",
-    45: "j",
-    46: "k",
-    47: "l",
-    48: "m",
-    49: "n",
-    50: "o",
-    51: "p",
-    52: "q",
-    53: "r",
-    54: "s",
-    55: "t",
-    56: "u",
-    57: "v",
-    58: "w",
-    59: "x",
-    60: "y",
-    61: "z",
+labels_to_numbers = {
+    '0': 0,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    'A': 10,
+    'B': 11,
+    'C': 12,
+    'D': 13,
+    'E': 14,
+    'F': 15,
+    'G': 16,
+    'H': 17,
+    'I': 18,
+    'J': 19,
+    'K': 20,
+    'L': 21,
+    'M': 22,
+    'N': 23,
+    'O': 24,
+    'P': 25,
+    'Q': 26,
+    'R': 27,
+    'S': 28,
+    'T': 29,
+    'U': 30,
+    'V': 31,
+    'W': 32,
+    'X': 33,
+    'Y': 34,
+    'Z': 35,
+    'a': 36,
+    'b': 37,
+    'd': 38,
+    'e': 39,
+    'f': 40,
+    'g': 41,
+    'h': 42,
+    'n': 43,
+    'q': 44,
+    'r': 45,
+    't': 46,
+    '!': 47,
+    '(': 48,
+    ')': 49,
+    '+': 50,
+    ',': 51,
+    '-': 52,
+    '=': 53,
+    '[': 54,
+    ']': 55,
+    'alpha': 56,
+    'ascii_124': 57,
+    'beta': 58,
+    'Delta': 59,
+    'div': 60,
+    'exists': 61,
+    'forall': 62,
+    'forward_slash': 63,
+    'gamma': 64,
+    'gt': 65,
+    'in': 66,
+    'infty': 67,
+    'int': 68,
+    'lambda': 69,
+    'lt': 70,
+    'mu': 71,
+    'neq': 72,
+    'phi': 73,
+    'pi': 74,
+    'prime': 75,
+    'rightarrow': 76,
+    'sigma': 77,
+    'sqrt': 78,
+    'sum': 79,
+    'theta': 80,
+    'times': 81,
+    '{': 82,
+    '}': 83
 }
-def load_dataset(dataset_type, starting_index, finishing_index):
-    if dataset_type == "train":
-        training_dataset, dataset_info = tensorflow_datasets.load(
-            "emnist/bymerge",
-            split=f"train[{starting_index}:{finishing_index}]", # Processing all of the data takes a fair bit of time. I'm choosing to only load the first few samples for now and when I get to proper training obviously I'll load more.
-            as_supervised=True,
-            with_info=True)
-        training_images = []
-        training_labels = []
-        for image, label in training_dataset:
-            image = numpy.array(image)
-            scaled = scale_array_to_0_to_1(image)
-            transposed = numpy.transpose(scaled)
-            reshaped = numpy.reshape(transposed, (28, 28, 1))
-            training_images.append(reshaped)
-            training_labels.append(numpy.array(label))
-        images_matrix = numpy.stack(training_images)
-        labels_matrix = numpy.stack(training_labels)
-        return images_matrix, labels_matrix
-
-    elif dataset_type == "test":
-        testing_dataset, dataset_info = tensorflow_datasets.load(
-            "emnist/bymerge",
-            split=f"test[{starting_index}:{finishing_index}]",
-            as_supervised=True,
-            with_info=True)
-        testing_images = []
-        testing_labels = []
-        for image, label in testing_dataset:
-            image = numpy.array(image)
-            scaled = scale_array_to_0_to_1(image)
-            transposed = numpy.transpose(scaled)
-            reshaped = numpy.reshape(transposed, (28, 28, 1))
-            testing_images.append(reshaped)
-            testing_labels.append(numpy.array(label))
-
-        images_matrix = numpy.stack(testing_images)
-        labels_matrix = numpy.stack(testing_labels)
-        return images_matrix, labels_matrix
-
+numbers_to_labels = {
+    0: '0',
+    1: '1',
+    2: '2',
+    3: '3',
+    4: '4',
+    5: '5',
+    6: '6',
+    7: '7',
+    8: '8',
+    9: '9',
+    10: 'A',
+    11: 'B',
+    12: 'C',
+    13: 'D',
+    14: 'E',
+    15: 'F',
+    16: 'G',
+    17: 'H',
+    18: 'I',
+    19: 'J',
+    20: 'K',
+    21: 'L',
+    22: 'M',
+    23: 'N',
+    24: 'O',
+    25: 'P',
+    26: 'Q',
+    27: 'R',
+    28: 'S',
+    29: 'T',
+    30: 'U',
+    31: 'V',
+    32: 'W',
+    33: 'X',
+    34: 'Y',
+    35: 'Z',
+    36: 'a',
+    37: 'b',
+    38: 'd',
+    39: 'e',
+    40: 'f',
+    41: 'g',
+    42: 'h',
+    43: 'n',
+    44: 'q',
+    45: 'r',
+    46: 't',
+    47: '!',
+    48: '(',
+    49: ')',
+    50: '+',
+    51: ',',
+    52: '-',
+    53: '=',
+    54: '[',
+    55: ']',
+    56: 'alpha',
+    57: 'ascii_124',
+    58: 'beta',
+    59: 'Delta',
+    60: 'div',
+    61: 'exists',
+    62: 'forall',
+    63: 'forward_slash',
+    64: 'gamma',
+    65: 'gt',
+    66: 'in',
+    67: 'infty',
+    68: 'int',
+    69: 'lambda',
+    70: 'lt',
+    71: 'mu',
+    72: 'neq',
+    73: 'phi',
+    74: 'pi',
+    75: 'prime',
+    76: 'rightarrow',
+    77: 'sigma',
+    78: 'sqrt',
+    79: 'sum',
+    80: 'theta',
+    81: 'times',
+    82: '{',
+    83: '}'
+}
 
 
 
@@ -122,6 +190,7 @@ def load_dataset(dataset_type, starting_index, finishing_index):
 
 class Linear_Layer:
     def __init__(self, num_of_inputs, num_of_neurons, classifier):
+        self.classifier = classifier
         self.num_of_inputs = num_of_inputs
         self.num_of_neurons = num_of_neurons
         weights = numpy.random.randn(num_of_inputs, num_of_neurons) * math.sqrt(2/num_of_inputs)
@@ -139,8 +208,8 @@ class Linear_Layer:
         dInput = numpy.matmul(dOutput, numpy.transpose(self.weights))
         dWeights = numpy.matmul(numpy.transpose(self.input), dOutput) / dOutput.shape[0]
         dBias = numpy.sum(dOutput, axis=0)
-        classifier.gradients[self.id]["weights"] = dWeights
-        classifier.gradients[self.id]["bias"] = dBias
+        self.classifier.gradients[self.id]["weights"] = dWeights
+        self.classifier.gradients[self.id]["bias"] = dBias
         return dInput
 
 
@@ -151,6 +220,7 @@ class ReLU_Layer:
         self.type = "ReLU Layer"
         self.id = classifier.layer_ids[-1] + 1
         self.mask = None
+        self.classifier = classifier
         classifier.layer_ids.append(self.id)
 
     def forward_pass(self, input):
@@ -168,6 +238,7 @@ class ReLU_Layer:
 class CONV_Layer:
     def __init__(self, kernel_size, num_of_filters, stride, input_depth, input_width, classifier):
         self.kernel_size = kernel_size
+        self.classifier = classifier
         self.num_of_filters = num_of_filters
         self.stride = stride
         self.padding = (kernel_size-1)//2
@@ -266,7 +337,7 @@ class CONV_Layer:
         input_to_coL2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
         total_patches = height * width * batch_size
         input_to_coL2im = input_to_coL2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
-        classifier.gradients[self.id] = {
+        self.classifier.gradients[self.id] = {
             "weights": dWeights,
             "bias": dBias
         }
@@ -294,9 +365,8 @@ def get_random_hyperparams():
     LR_UB = 0.003
     default_LR = 0.001
     LR_range_test = True #Set this to true if you want to be checking the LR range.
-    batch_size_LB = 32
-    batch_size_UB = 256
-    default_batch_size = 128
+    batch_size_options = [65, 130]
+    default_batch_size = 130
     batch_size_test = True
     L2_LB = 0.01
     L2_UB = 0.1
@@ -311,7 +381,7 @@ def get_random_hyperparams():
     LR_decay_default = learning_rate_decay_options[0]
     random_LR = random.uniform(LR_LB, LR_UB)
     random_L2 = random.uniform(L2_LB, L2_UB)
-    random_batch_size = random.randint(batch_size_LB,batch_size_UB)
+    random_batch_size = random.choice(batch_size_options)
     random_filter_size = random.choice(possible_filter_sizes)
     random_LR_decay = random.choice(learning_rate_decay_options)
 
@@ -498,10 +568,9 @@ def write_new_line_to_file(filename, line):
     with open(filepath, "a") as file:
         file.write(line + "\n")
 class Classification_Model_NEW():
-    def __init__(self):
-        hyperparams = get_random_hyperparams()
+    def __init__(self, hyperparams):
         print(hyperparams)
-        write_new_line_to_file("night of 28-1", f"LR = {hyperparams[0]}, batch_size = {hyperparams[1]}, L2_strength = {hyperparams[2]}, filter_sizes = {hyperparams[3]}, LR decay = {hyperparams[4]}")
+        # write_new_line_to_file("night of 28-1", f"LR = {hyperparams[0]}, batch_size = {hyperparams[1]}, L2_strength = {hyperparams[2]}, filter_sizes = {hyperparams[3]}, LR decay = {hyperparams[4]}")
         self.hyperparams = hyperparams
         self.layer_ids = [-1]  # -1 does not correspond to a layer, it is just to avoid error handling
         layer_0 = CONV_Layer(3, hyperparams[3][0], 1, 1, 28, self)
@@ -510,7 +579,7 @@ class Classification_Model_NEW():
         layer_3 = ReLU_Layer(self)  # dOutput = 28*28*64
         layer_4 = CONV_Layer(3, hyperparams[3][2], 1, hyperparams[3][1], 28, self)  # dOutput = 28*28*128
         layer_5 = Flatten_Layer(self)  # dOutput = 100352
-        layer_6 = Linear_Layer(28 * 28 * hyperparams[3][2], 47, self)  # dOutput = 62
+        layer_6 = Linear_Layer(28 * 28 * hyperparams[3][2], 84, self)  # dOutput = 62
 
         layers = [
             layer_0,
@@ -533,80 +602,117 @@ class Classification_Model_NEW():
         self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 0.00000001)
         self.optimiser.zero_gradients(self.layers)
         self.gradients = {}
-        for epoch in range (0, 4):
+        for epoch in range(0, 4):
             self.decayed_LR = LR_decay(self.hyperparams[4], self.hyperparams[0], epoch)
             self.optimiser.learning_rate = self.decayed_LR
             time_tuple = time.localtime()
             time_at_start = str(time_tuple[3]) + ":" + str(time_tuple[4]) + ":" + str(time_tuple[5])
             print(f"time at start of epoch {epoch} = {time_at_start}")
             total_correct = 0
-            total_images = 512
+            total_EMNIST_images = 30000
+            total_maths_images = 9000
+            total_images = total_EMNIST_images + total_maths_images #39000
             self.batch_size = self.hyperparams[1]
             batch_size = self.batch_size
+            # maths_per_batch = int(batch_size *3/13)
+            # EMNIST_per_batch = int(batch_size *10/13)
+            update_after_n_batches = 25
             loss_total = 0
-            for batch_start in range (0, total_images, batch_size):
-                for layer in self.layers:
-                    if layer.type == "Linear Layer":
-                        self.gradients[layer.id] = {
-                            "weights": None,
-                            "bias": None
-                        }
-                    elif layer.type == "CONV_Layer":
-                        self.gradients[layer.id] = {
-                            "weights": None,
-                            "bias": None
-                        }
-                time_before_loading_data = time.time()
-                training_images, training_labels = load_dataset("train", batch_start, batch_start+batch_size)
-                time_after_loading_data = time.time()
-                print(time_after_loading_data-time_before_loading_data)
-                if (batch_start // batch_size) % 50 == 0:
-                    print(f"Epoch {epoch}, Batch Number {(batch_start//batch_size)} of {total_images//batch_size}:")
-                time_at_batch_start = time.time()
-                ground_truth = training_labels
-                forward = training_images
-                for layer in self.layers:
-                    forward = layer.forward_pass(forward)
-                loss, dLoss, correct = batched_SVM(forward, ground_truth)
+            little_batch_size = batch_size
+            big_batch_size = 100 * little_batch_size #13000
+            #For provided parameters, 3 big batches, each with 100 little batches
+            for big_batch in range(0, total_images//(little_batch_size*100)):
+                maths_per_big_batch = int(big_batch_size * 3 / 13)
+                EMNIST_per_big_batch = int(big_batch_size * 10 / 13)
+                time_before_big_loading = time.time()
+                training_images, training_labels = get_full_set(maths_starting=maths_per_big_batch * big_batch, maths_finishing=maths_per_big_batch * (big_batch+1), EMNIST_starting=EMNIST_per_big_batch * big_batch, EMNIST_finishing=EMNIST_per_big_batch * (big_batch + 1), training_or_testing="training")
+                shuffled_indices = (list(range(0, len(training_images))))
+                random.shuffle(shuffled_indices)
+                loaded_batch_images = training_images[shuffled_indices]
+                loaded_batch_labels = training_labels[shuffled_indices]
+                time_after_big_loading = time.time()
+                time_for_big_loading = time_after_big_loading - time_before_big_loading
+                print("big_loading", round(time_for_big_loading, 3))
+                for little_batch in range(0, 100):
+                    time_before_loading_data = time.time()
+                    images_per_batch =loaded_batch_images[little_batch*little_batch_size: (little_batch+1)*little_batch_size]
+                    labels_per_batch =loaded_batch_labels[little_batch*little_batch_size: (little_batch+1)*little_batch_size]
+                    forward = images_per_batch
+                    ground_truth = labels_per_batch
+                    time_after_loading_data = time.time()
+                    if little_batch % update_after_n_batches == 0:
+                        print(f"Epoch {epoch}, Batch Number {little_batch}/{99} of big batch {big_batch}/{total_images//(little_batch_size*100)-1}")
+                    time_at_batch_start = time.time()
+                    time_before_layer_declaration = time.time()
+                    for layer in self.layers:
+                        if layer.type == "Linear Layer":
+                            self.gradients[layer.id] = {
+                                "weights": None,
+                                "bias": None
+                            }
+                        elif layer.type == "CONV_Layer":
+                            self.gradients[layer.id] = {
+                                "weights": None,
+                                "bias": None
+                            }
+                    time_after_layer_declaration = time.time()
+                    time_for_layer_declaration = time_after_layer_declaration - time_before_layer_declaration
+                    time_before_forward_pass = time.time()
+                    for layer in self.layers:
+                        # time_before_layer = time.time()
+                        forward = layer.forward_pass(forward)
+                        # time_after_layer = time.time()
+                        # time_for_layer = time_after_layer-time_before_layer
+                        # print("Layer", layer.id, time_for_layer)
+                    time_after_forward_pass = time.time()
+                    time_for_forward_pass = time_after_forward_pass - time_before_forward_pass
+                    time_before_L2 = time.time()
+                    loss, dLoss, correct = batched_SVM(forward, ground_truth)
+                    L2_loss = 0
+                    for layer in self.layers:
+                        if layer.type == "Linear Layer":
+                            L2_loss = L2_loss + numpy.sum(layer.weights ** 2)
+                        elif layer.type == "CONV_Layer":
+                            for filter_id in layer.filters:
+                                weights = layer.filters[filter_id]["weights"]
+                                L2_loss = L2_loss + numpy.sum(weights ** 2)
+                    L2_loss = (self.L2_lambda / 2) * L2_loss
+                    time_after_L2 = time.time()
+                    time_for_L2 = time_after_L2 - time_before_L2
+                    loss_total = loss_total + loss + L2_loss
+                    total_correct = total_correct + correct
+                    backward = dLoss
+                    time_before_backprop = time.time()
+                    for layer in reversed(self.layers):
+                        # time_before_layer = time.time()
+                        backward = layer.backprop(backward)
+                        # time_after_layer = time.time()
+                        # time_for_layer = time_after_layer - time_before_layer
+                        # print("Layer", layer.id, time_for_layer)
 
-                L2_loss = 0
-                for layer in self.layers:
-                    if layer.type == "Linear Layer":
-                        L2_loss = L2_loss + numpy.sum(layer.weights ** 2)
-                    elif layer.type == "CONV_Layer":
-                        for filter_id in layer.filters:
-                            weights = layer.filters[filter_id]["weights"]
-                            L2_loss = L2_loss + numpy.sum(weights ** 2)
-                L2_loss = (self.L2_lambda / 2) * L2_loss
-                loss_total = loss_total + loss + L2_loss
-                total_correct = total_correct + correct
-                backward = dLoss
-                for layer in reversed(self.layers):
-                     backward = layer.backprop(backward)
 
-                for layer in self.layers:
-                    if layer.type == "Linear Layer":
-                        self.gradients[layer.id]["weights"] += self.L2_lambda * layer.weights
-                    elif layer.type == "CONV_Layer":
-                        weights_matrix, bias_matrix = layer.full_weights_matrix()
-                        self.gradients[layer.id]["weights"] += self.L2_lambda * weights_matrix
+                    time_after_backprop = time.time()
+                    time_for_backprop = time_after_backprop - time_before_backprop
+                    time_before_optimiser_step = time.time()
+                    for layer in self.layers:
+                        if layer.type == "Linear Layer":
+                            self.gradients[layer.id]["weights"] += self.L2_lambda * layer.weights
+                        elif layer.type == "CONV_Layer":
+                            weights_matrix, bias_matrix = layer.full_weights_matrix()
+                            self.gradients[layer.id]["weights"] += self.L2_lambda * weights_matrix
+                    time_after_optimiser_step = time.time()
+                    time_for_optimiser_step = time_after_optimiser_step-time_before_optimiser_step
+                    time_at_batch_end = time.time()
+                    if little_batch % update_after_n_batches == 0:
+                        print(f"Time for Batch = {round(time_at_batch_end - time_at_batch_start, 5)}, time per image = {round(((time_at_batch_end - time_at_batch_start)/batch_size), 5)}")
+                        print("data_loading", round(time_after_loading_data-time_before_loading_data, 3))
+                        print("layer_declaration", round(time_for_layer_declaration, 3))
+                        print("forward_pass", round(time_for_forward_pass, 3))
+                        print("L2", round(time_for_L2, 3))
+                        print("backprop", round(time_for_backprop, 3))
+                        print("optimiser_step", round(time_for_optimiser_step, 3))
 
-                time_at_batch_end = time.time()
-                if (batch_start//batch_size) % 50 == 0:
-                    print(f"Time for Batch = {round(time_at_batch_end - time_at_batch_start, 5)}, time per image = {round(((time_at_batch_end - time_at_batch_start)/batch_size), 5)}")
-
-                self.optimiser.step(self.gradients)
-
-            # average_loss = loss_total/(total_images)
-            # accuracy = self.accuracy_check()
-            # if accuracy > self.best_accuracy:
-            #     self.best_accuracy = accuracy
-            #     self.epoch_with_best_accuracy = epoch
-            # print(f"Average Loss for epoch {epoch} = {average_loss}")
-            # string_to_store = f"Accuracy for epoch {epoch} = {accuracy}"
-
-        string_to_store = f"Accuracy on epoch 3 = {self.accuracy_check()}"
-        write_new_line_to_file("night of 28-1", string_to_store)
+        return self.accuracy_check()
 
     def save_parameters(self):
         for layer in self.layers:
@@ -625,23 +731,28 @@ class Classification_Model_NEW():
         return layers_with_params
 
     def accuracy_check(self):
-        # print("Accuracy Check Started")
+        time_before_accuracy_check = time.time()
         correct_counter = 0
-        testing_images, testing_labels = load_dataset("test", 0, 1000)
-        # print("Image Loading Done")
-        for index in range (0, len(testing_images)):
-            # if index % 100 == 0:
-                # print(f"Testing Image {index}")
-            image = testing_images[index]
-            label = testing_labels[index]
-            image_batched = numpy.expand_dims(image, axis=0)
-            forward = image_batched
+        testing_images, testing_labels = get_full_set(0, 24000, 0, 80000, "testing")
+        #104k total images, batch_size = 130, gets 800 batches
+        for batch in range (0, 800):
+            starting_index = batch*130
+            finishing_index = (batch+1)*130
+            forward = testing_images[starting_index:finishing_index]
+            labels = testing_labels[starting_index:finishing_index]
             for layer in self.layers:
                 forward = layer.forward_pass(forward)
-            prediction = numpy.argmax(forward[0])
-            if prediction == label:
-                correct_counter = correct_counter + 1
-        return round((correct_counter / len(testing_images) * 100), 2)
+            predictions = numpy.argmax(forward, axis=1)
+            # print(predictions.shape)
+            for prediction_index in range(0, 130):
+                prediction = predictions[prediction_index]
+                label = labels[prediction_index]
+                if prediction == label:
+                    correct_counter = correct_counter + 1
+        time_after_accuracy_check = time.time()
+        time_for_accuracy_check = time_after_accuracy_check-time_before_accuracy_check
+        print("Accuracy check", round(time_for_accuracy_check, 3))
+        return round((correct_counter / len(testing_images) * 100), 3)
 
     def get_prediction(self, image):
         forward = image
@@ -651,13 +762,31 @@ class Classification_Model_NEW():
         certainty = numpy.argmax(forward) #THIS CODE ISN'T FINISHED YET
         return prediction, certainty
 
+# hyperparam_list = []
+# for hyperparam_set_number in range(0, 25): #This code is currently commented as it does not need to be run more than once.
+#     hyperparam_set = get_random_hyperparams()
+#     hyperparam_list.append(hyperparam_set)
+#
+# with open(os.path.join(base_training_data, "hyperparams.json"), "w") as file:
+#     json.dump(hyperparam_list, file)
+# with open(os.path.join(base_training_data, "accuracies.json"), "w") as file:
+#     json.dump([], file)
 
-for hyperparam_set in range(0, 25):
-    string_to_store = (f"Hyperparam set {hyperparam_set}")
-    write_new_line_to_file("night of 28-1", string_to_store)
-    classifier = Classification_Model_NEW()
-    classifier.train()
+def get_progress():
+    with open(os.path.join(base_training_data, "hyperparams.json"), "r") as file:
+        hyperparams = json.load(file)
+    with open(os.path.join(base_training_data, "accuracies.json"), "r") as file:
+        accuracies = json.load(file)
+    number_of_combinations_ran = len(accuracies)
+    remaining_hyperparams = hyperparams[number_of_combinations_ran:]
+    for remaining_hyperparam in remaining_hyperparams:
+        classifier = Classification_Model_NEW(remaining_hyperparam)
+        accuracy = classifier.train()
+        # accuracy = classifier.accuracy_check()
+        accuracies.append(accuracy)
+        with open(os.path.join(base_training_data, "accuracies.json"), "w") as file:
+            json.dump(accuracies, file)
 
 
-
-
+get_progress()
+##

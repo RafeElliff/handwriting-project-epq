@@ -9,7 +9,7 @@ maths_source_data = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all
 twentyeight_x_twentyeight_images = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths\28_x_28_images"
 base_maths = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths"
 
-
+#
 def rename_and_move_images():     #This code renames all the images to have the format {id}_{class}.npy
     image_id = -1
     for class_of_character in os.listdir(maths_source_data):
@@ -113,14 +113,94 @@ labels_to_numbers = {
     '{': 82,
     '}': 83
 }
-
+numbers_to_labels = {
+    0: '0',
+    1: '1',
+    2: '2',
+    3: '3',
+    4: '4',
+    5: '5',
+    6: '6',
+    7: '7',
+    8: '8',
+    9: '9',
+    10: 'A',
+    11: 'B',
+    12: 'C',
+    13: 'D',
+    14: 'E',
+    15: 'F',
+    16: 'G',
+    17: 'H',
+    18: 'I',
+    19: 'J',
+    20: 'K',
+    21: 'L',
+    22: 'M',
+    23: 'N',
+    24: 'O',
+    25: 'P',
+    26: 'Q',
+    27: 'R',
+    28: 'S',
+    29: 'T',
+    30: 'U',
+    31: 'V',
+    32: 'W',
+    33: 'X',
+    34: 'Y',
+    35: 'Z',
+    36: 'a',
+    37: 'b',
+    38: 'd',
+    39: 'e',
+    40: 'f',
+    41: 'g',
+    42: 'h',
+    43: 'n',
+    44: 'q',
+    45: 'r',
+    46: 't',
+    47: '!',
+    48: '(',
+    49: ')',
+    50: '+',
+    51: ',',
+    52: '-',
+    53: '=',
+    54: '[',
+    55: ']',
+    56: 'alpha',
+    57: 'ascii_124',
+    58: 'beta',
+    59: 'Delta',
+    60: 'div',
+    61: 'exists',
+    62: 'forall',
+    63: 'forward_slash',
+    64: 'gamma',
+    65: 'gt',
+    66: 'in',
+    67: 'infty',
+    68: 'int',
+    69: 'lambda',
+    70: 'lt',
+    71: 'mu',
+    72: 'neq',
+    73: 'phi',
+    74: 'pi',
+    75: 'prime',
+    76: 'rightarrow',
+    77: 'sigma',
+    78: 'sqrt',
+    79: 'sum',
+    80: 'theta',
+    81: 'times',
+    82: '{',
+    83: '}'
+}
 
 number_of_images = 234647
-# list_from_0_to_n = list(range(0, number_of_images))
-# random.shuffle(list_from_0_to_n)
-# print(list_from_0_to_n[0:100])
-# with open(os.path.join(base_maths, "shuffled_indices.json"), "w") as file:
-#     json.dump(list_from_0_to_n, file)
 
 
 
@@ -175,5 +255,5 @@ def check_progress():
     return remaining_indices
 
 
-# rename_and_move_images()
-produce_random_ordering_and_labels()
+# rename_and_move_images()#
+# produce_random_ordering_and_labels()

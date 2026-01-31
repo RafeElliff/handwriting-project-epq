@@ -6,11 +6,12 @@ import tensorflow_datasets
 from helper_functions import scale_array_to_0_to_1
 base_maths = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths"
 
+##
 def get_maths_images(starting_index, finishing_index, training_or_testing):
     batch_size = finishing_index - starting_index
     if training_or_testing == "training":
         images_in_folder = os.listdir(os.path.join(base_maths, "training_images"))
-        images_in_folder.sort()
+        images_in_folder.sort(key=lambda x: int(x.split('.')[0]))
         images_to_add = images_in_folder[starting_index:finishing_index]
         list_of_numpys = []
         for image_name in images_to_add:
@@ -24,6 +25,7 @@ def get_maths_images(starting_index, finishing_index, training_or_testing):
             labels_matrix = numpy.stack(labels_sliced)
     elif training_or_testing == "testing":
         images_in_folder = os.listdir(os.path.join(base_maths, "testing_images"))
+        images_in_folder.sort(key=lambda x: int(x.split('.')[0]))
         images_to_add = images_in_folder[starting_index:finishing_index]
         list_of_numpys = []
         for image_name in images_to_add:
@@ -31,7 +33,7 @@ def get_maths_images(starting_index, finishing_index, training_or_testing):
             list_of_numpys.append(image_numpy)
         images_matrix = numpy.stack(list_of_numpys)
         images_matrix = images_matrix.reshape(batch_size, 28, 28, 1)
-        with open(os.path.join(base_maths, "training_labels.json"), "r") as file:
+        with open(os.path.join(base_maths, "testing_labels.json"), "r") as file:
             labels = json.load(file)
             labels_sliced = labels[starting_index: finishing_index]
             labels_matrix = numpy.stack(labels_sliced)
@@ -92,3 +94,4 @@ def get_full_set(maths_starting, maths_finishing, EMNIST_starting, EMNIST_finish
     final_images_matrix = numpy.concatenate([maths_images_matrix, EMNIST_images_matrix])
     final_labels_matrix = numpy.concatenate([maths_labels_matrix, EMNIST_labels_matrix])
     return final_images_matrix, final_labels_matrix
+
