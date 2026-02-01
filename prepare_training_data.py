@@ -4,22 +4,21 @@ import numpy
 import random
 import json
 import time
-from helper_functions import resize_to_28_x_28, scale_array_to_0_to_1
-maths_source_data = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths\maths_source_data"
-twentyeight_x_twentyeight_images = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths\28_x_28_images"
-base_maths = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths"
+from helper_functions import resize_to_28_x_28, scale_array_to_0_to_1, view_numpy_as_jpg
+maths_source_data = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq\extracted_images"
+twentyeight_x_twentyeight_images = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq\28_x_28_images"
+base_maths = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq"
 
 #
-def rename_and_move_images():     #This code renames all the images to have the format {id}_{class}.npy
+def rename_and_move_images():#This code renames all the images to have the format {id}_{class}.npy
     image_id = -1
     for class_of_character in os.listdir(maths_source_data):
         folder = os.path.join(maths_source_data, class_of_character)
         print(folder)
         for image_name in os.listdir(folder):
-            print(image_name)
             image_id = image_id + 1
             source_path = os.path.join(folder, image_name)
-            image_new_name = f"{str(image_id)}_{class_of_character}"
+            image_new_name = f"{str(image_id)}_{class_of_character}" + ".npy"
             new_path = os.path.join(twentyeight_x_twentyeight_images, image_new_name)
             fortyfive_fortyfive_image = cv2.imread(source_path)
             gray_image = cv2.cvtColor(fortyfive_fortyfive_image, cv2.COLOR_BGR2GRAY)
@@ -203,7 +202,10 @@ numbers_to_labels = {
 number_of_images = 234647
 
 
-
+# shuffled_indices = list(range(0, 234646))
+# random.shuffle(shuffled_indices)
+# with open(os.path.join(base_maths, "shuffled_indices.json"), "w") as file:
+#     json.dump(shuffled_indices, file)
 
 def produce_random_ordering_and_labels():
     with open(os.path.join(base_maths, "training_labels.json"), "r") as file:
@@ -231,6 +233,7 @@ def produce_random_ordering_and_labels():
             image_as_npy = numpy.load(os.path.join(twentyeight_x_twentyeight_images, image_old_name))
             numpy.save(destination_path, image_as_npy)
             training_labels.append(image_label_as_number)
+            # view_numpy_as_jpg(filepath=None, numpy=image_as_npy, label=image_label_as_number)
         else:
             destination_path = os.path.join(base_maths, "testing_images", f"{image_new_position}.npy")
             image_as_npy = numpy.load(os.path.join(twentyeight_x_twentyeight_images, image_old_name))
@@ -238,6 +241,7 @@ def produce_random_ordering_and_labels():
             testing_labels.append(image_label_as_number)
 
         if image_new_position % 1000 == 0:
+            print(image_new_position)
             with open(os.path.join(base_maths, "testing_labels.json"), "w") as file:
                 json.dump(testing_labels, file)
             with open(os.path.join(base_maths, "training_labels.json"), "w") as file:
@@ -255,5 +259,8 @@ def check_progress():
     return remaining_indices
 
 
-# rename_and_move_images()#
+# rename_and_move_images()
 # produce_random_ordering_and_labels()
+# id = 4
+# view_numpy_as_jpg(filepath = os.path.join(base_maths, "training_images", f"{id}.npy"), numpy_file = None, label = "test" )
+# print()

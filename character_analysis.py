@@ -7,8 +7,10 @@ import time
 import pickle
 from helper_functions import scale_array_to_0_to_1
 from load_images import get_EMNIST_images, get_maths_images, get_full_set
-base_training_data = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\training data runs"
 import json
+from numpy.lib.stride_tricks import as_strided
+base_training_data = (r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq")
+
 
 labels_to_numbers = {
     '0': 0,
@@ -259,36 +261,43 @@ class CONV_Layer:
                 "bias": bias
             }
 
-    def im2col(self, images_batch): # get all_patches. image should be padded
+    def im2col(self, images_batch):
         batch_size, height, width, depth = images_batch.shape
-        num_patches = height - self.padding * 2
 
-        output_patches = []
-        for image_index in range(0, batch_size):
-            image = images_batch[image_index]
-            for row in range (0, num_patches):
-                for column in range (0, num_patches):
-                    patch = image[row: row+self.kernel_size, column: column+self.kernel_size, :].flatten() #each output here has size 3*3*input_depth
-                    output_patches.append(patch)
-
-        numpy_array = numpy.stack(output_patches)
-        transposed = numpy_array.transpose() #For matrix multiplication, it is important that it is 9*input_depth,784, not 784, 9*input_depth as the for loop makes it.
-
+        output_height = (height - self.kernel_size) // self.stride + 1
+        output_width = (width - self.kernel_size) // self.stride + 1
+        stride_0, stride_1, stride_2, stride_3 = images_batch.strides
+        strided = as_strided(
+            images_batch,
+            shape = (batch_size, output_height, output_width, self.kernel_size, self.kernel_size, depth),
+            strides=(stride_0, stride_1 * self.stride, stride_2 * self.stride, stride_1, stride_2, stride_3),
+            writeable = False
+        )
+        cols = strided.reshape(batch_size * output_height * output_width, -1)
+        transposed = cols.transpose()
         return transposed
 
-    def coL2im(self, four_d_matrix):
+    def col2im(self, four_d_matrix):
         padded_forward_pass = self.input
         original_image = self.original_images
         dInput_padded = numpy.zeros_like(padded_forward_pass)
         batch_size, height_orig, width_orig, depth_orig = original_image.shape
-        patch_id = -1
-        for image_id in range(0, batch_size):
-            for row in range(0, height_orig):
-                for column in range(0, width_orig):
-                    patch_id = patch_id +1
-                    dInput_padded[image_id, row: row+self.kernel_size, column: column+self.kernel_size, :] += four_d_matrix[:, :, :, patch_id] # I dont normally use += as it generally makes code less readable imo but i think it makes it more readable here
-        dInput = dInput_padded[:, self.padding:-self.padding, self.padding:-self.padding, :]
 
+        col_reshaped = four_d_matrix.reshape(
+            self.kernel_size, self.kernel_size, depth_orig,
+            batch_size, height_orig, width_orig
+        )
+
+        for kernel_height in range(0, self.kernel_size):
+            for kernel_width in range(0, self.kernel_size):
+                height_start = kernel_height
+                height_end = height_start + height_orig * self.stride
+                width_start = kernel_width
+                width_end = width_start + width_orig * self.stride
+
+                dInput_padded[:, height_start:height_end:self.stride, width_start:width_end:self.stride, :] += col_reshaped[kernel_height, kernel_width, :, :, :, :].transpose(1, 2, 3, 0)
+
+        dInput = dInput_padded[:, self.padding:-self.padding, self.padding:-self.padding, :]
         return dInput
 
     def full_weights_matrix(self):
@@ -306,13 +315,16 @@ class CONV_Layer:
         return weights_numpy, bias_matrix
 
     def forward_pass(self, images_batch):
+        time_before_total = time.time()
         batch_size, orig_height, orig_width, orig_depth = images_batch.shape
         self.batch_size = batch_size
         padded = numpy.pad(images_batch, ((0, 0),(self.padding, self.padding), (self.padding, self.padding), (0,0)), mode='constant')
         self.input = padded
         self.original_images = images_batch
         batch_size, orig_height, orig_width, orig_depth= images_batch.shape
-        patch_matrix = self.im2col(padded)
+        time_before_im2col= time.time()
+        patch_matrix = (self.im2col(padded))
+        time_after_im2col = time.time()
         weights_matrix, bias_matrix = self.full_weights_matrix()
         self.weights = weights_matrix
         results = numpy.matmul(weights_matrix, patch_matrix) + bias_matrix
@@ -320,9 +332,13 @@ class CONV_Layer:
         transposed_results = numpy.transpose(reshaped_results, (1, 2, 3, 0))
 
         self.patch_matrix = patch_matrix
+        time_after_total = time.time()
+        # print("total time forward", self.id, time_after_total - time_before_total)
+        # print("im2col time forward", self.id, time_after_im2col - time_before_im2col)
         return transposed_results
 
     def backprop(self, dOutput):
+        time_before = time.time()
         weights = self.weights
         batch_size, height, width, depth = dOutput.shape
         dBias = []
@@ -334,14 +350,18 @@ class CONV_Layer:
         patch_matrix = self.patch_matrix
         transposed_patch_matrix = patch_matrix.transpose()
         dWeights = numpy.matmul(dOutput_reshaped, transposed_patch_matrix) / batch_size
-        input_to_coL2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
+        input_to_col2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
         total_patches = height * width * batch_size
-        input_to_coL2im = input_to_coL2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
+        input_to_col2im = input_to_col2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
         self.classifier.gradients[self.id] = {
             "weights": dWeights,
             "bias": dBias
         }
-        dInput = self.coL2im(input_to_coL2im)
+        time_before_col2im = time.time()
+        dInput = self.col2im(input_to_col2im)
+        time_after = time.time()
+        # print("total time backward", self.id, time_after - time_before)
+        # print("col2im time backward", self.id, time_after - time_before_col2im)
         return dInput
 
 
@@ -602,7 +622,7 @@ class Classification_Model_NEW():
         self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 0.00000001)
         self.optimiser.zero_gradients(self.layers)
         self.gradients = {}
-        for epoch in range(0, 4):
+        for epoch in range(0, 8):
             self.decayed_LR = LR_decay(self.hyperparams[4], self.hyperparams[0], epoch)
             self.optimiser.learning_rate = self.decayed_LR
             time_tuple = time.localtime()
@@ -616,7 +636,7 @@ class Classification_Model_NEW():
             batch_size = self.batch_size
             # maths_per_batch = int(batch_size *3/13)
             # EMNIST_per_batch = int(batch_size *10/13)
-            update_after_n_batches = 25
+            update_after_n_batches = 1
             loss_total = 0
             little_batch_size = batch_size
             big_batch_size = 100 * little_batch_size #13000
@@ -733,8 +753,9 @@ class Classification_Model_NEW():
     def accuracy_check(self):
         time_before_accuracy_check = time.time()
         correct_counter = 0
-        testing_images, testing_labels = get_full_set(0, 24000, 0, 80000, "testing")
-        #104k total images, batch_size = 130, gets 800 batches
+        #Onle one of the following lines should be uncommented. The top one uses the testing set, the bottom one uses the validation set.
+        #testing_images, testing_labels = get_full_set(0, 24000, 0, 80000, "testing")
+        testing_images, testing_labels = get_full_set(182000, 208000, 600000, 697000, "training")
         for batch in range (0, 800):
             starting_index = batch*130
             finishing_index = (batch+1)*130

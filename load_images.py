@@ -4,7 +4,7 @@ import time
 import json
 import tensorflow_datasets
 from helper_functions import scale_array_to_0_to_1
-base_maths = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\all_training_data\maths"
+base_maths = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq"
 
 ##
 def get_maths_images(starting_index, finishing_index, training_or_testing):
@@ -94,4 +94,5 @@ def get_full_set(maths_starting, maths_finishing, EMNIST_starting, EMNIST_finish
     final_images_matrix = numpy.concatenate([maths_images_matrix, EMNIST_images_matrix])
     final_labels_matrix = numpy.concatenate([maths_labels_matrix, EMNIST_labels_matrix])
     return final_images_matrix, final_labels_matrix
+
 
