@@ -17,6 +17,7 @@ def get_maths_images(starting_index, finishing_index, training_or_testing):
         list_of_numpys = []
         for image_name in images_to_add:
             image_numpy = numpy.load(os.path.join(base_maths, "training_images", image_name))
+            image_numpy = image_numpy.astype(numpy.float32)
             list_of_numpys.append(image_numpy)
         images_matrix = numpy.stack(list_of_numpys)
         images_matrix = images_matrix.reshape(batch_size, 28, 28, 1)
@@ -31,6 +32,7 @@ def get_maths_images(starting_index, finishing_index, training_or_testing):
         list_of_numpys = []
         for image_name in images_to_add:
             image_numpy = numpy.load(os.path.join(base_maths, "testing_images", image_name))
+            image_numpy = image_numpy.astype(numpy.float32)
             list_of_numpys.append(image_numpy)
         images_matrix = numpy.stack(list_of_numpys)
         images_matrix = images_matrix.reshape(batch_size, 28, 28, 1)
@@ -59,7 +61,7 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         training_images = []
         training_labels = []
         for image, label in training_dataset:
-            image = numpy.array(image)
+            image = numpy.array(image, dtype=numpy.float32)
             scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))
@@ -99,5 +101,3 @@ def get_full_set(maths_starting, maths_finishing, EMNIST_starting, EMNIST_finish
     final_labels_matrix_shuffled = final_labels_matrix[shuffled_indices]
     final_images_matrix_shuffled = final_images_matrix[shuffled_indices]
     return final_images_matrix_shuffled, final_labels_matrix_shuffled
-
-
