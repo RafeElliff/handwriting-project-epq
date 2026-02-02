@@ -5,12 +5,12 @@ import numpy
 import math
 import time
 import pickle
-from helper_functions import scale_array_to_0_to_1
+from helper_functions import scale_array_to_0_to_1, view_numpy_as_jpg
 from load_images import get_EMNIST_images, get_maths_images, get_full_set
 import json
 from numpy.lib.stride_tricks import as_strided
-base_training_data = (r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq")
 
+base_training_data = (r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq")
 
 labels_to_numbers = {
     '0': 0,
@@ -186,30 +186,28 @@ numbers_to_labels = {
 }
 
 
-
-
-
-
 class Linear_Layer:
     def __init__(self, num_of_inputs, num_of_neurons, classifier):
         self.classifier = classifier
         self.num_of_inputs = num_of_inputs
         self.num_of_neurons = num_of_neurons
-        weights = numpy.random.randn(num_of_inputs, num_of_neurons) * math.sqrt(2/num_of_inputs)
+        weights = numpy.random.randn(num_of_inputs, num_of_neurons) * math.sqrt(2 / num_of_inputs)
         self.weights = weights
         self.bias = numpy.zeros(num_of_neurons)
         self.input = None
         self.type = "Linear Layer"
         self.id = classifier.layer_ids[-1] + 1
         classifier.layer_ids.append(self.id)
+
     def forward_pass(self, input):
         self.input = input
         output = numpy.matmul(input, self.weights) + self.bias
         return output
+
     def backprop(self, dOutput):
         dInput = numpy.matmul(dOutput, numpy.transpose(self.weights))
         dWeights = numpy.matmul(numpy.transpose(self.input), dOutput) / dOutput.shape[0]
-        dBias = numpy.sum(dOutput, axis=0)
+        dBias = numpy.sum(dOutput, axis=0) / dOutput.shape[0]
         self.classifier.gradients[self.id]["weights"] = dWeights
         self.classifier.gradients[self.id]["bias"] = dBias
         return dInput
@@ -232,7 +230,8 @@ class ReLU_Layer:
         self.output = output
         return output
 
-    def backprop(self, dOutput): # The naming here can be a bit confusing. 'Input' and 'Output' always refer to the forward pass, so confusingly here we take dOutput and compute dInput from that.
+    def backprop(self,
+                 dOutput):  # The naming here can be a bit confusing. 'Input' and 'Output' always refer to the forward pass, so confusingly here we take dOutput and compute dInput from that.
         dInput = dOutput * self.mask
         return dInput
 
@@ -243,18 +242,20 @@ class CONV_Layer:
         self.classifier = classifier
         self.num_of_filters = num_of_filters
         self.stride = stride
-        self.padding = (kernel_size-1)//2
+        self.padding = (kernel_size - 1) // 2
         self.input_depth = input_depth
         self.input_width = input_width
         self.id = classifier.layer_ids[-1] + 1
         classifier.layer_ids.append(self.id)
         self.type = "CONV_Layer"
         self.initialise_filter_weights()
+
     def initialise_filter_weights(self):
         self.filters = {}
         num_of_filters = self.num_of_filters
-        for filter in range (0, num_of_filters):
-            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth) * math.sqrt(2/self.num_of_filters)
+        for filter in range(0, num_of_filters):
+            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth) * math.sqrt(
+                2 / self.num_of_filters)
             bias = 0
             self.filters[filter] = {
                 "weights": weights,
@@ -269,9 +270,9 @@ class CONV_Layer:
         stride_0, stride_1, stride_2, stride_3 = images_batch.strides
         strided = as_strided(
             images_batch,
-            shape = (batch_size, output_height, output_width, self.kernel_size, self.kernel_size, depth),
+            shape=(batch_size, output_height, output_width, self.kernel_size, self.kernel_size, depth),
             strides=(stride_0, stride_1 * self.stride, stride_2 * self.stride, stride_1, stride_2, stride_3),
-            writeable = False
+            writeable=False
         )
         cols = strided.reshape(batch_size * output_height * output_width, -1)
         transposed = cols.transpose()
@@ -295,7 +296,8 @@ class CONV_Layer:
                 width_start = kernel_width
                 width_end = width_start + width_orig * self.stride
 
-                dInput_padded[:, height_start:height_end:self.stride, width_start:width_end:self.stride, :] += col_reshaped[kernel_height, kernel_width, :, :, :, :].transpose(1, 2, 3, 0)
+                dInput_padded[:, height_start:height_end:self.stride, width_start:width_end:self.stride, :] += \
+                col_reshaped[kernel_height, kernel_width, :, :, :, :].transpose(1, 2, 3, 0)
 
         dInput = dInput_padded[:, self.padding:-self.padding, self.padding:-self.padding, :]
         return dInput
@@ -318,17 +320,18 @@ class CONV_Layer:
         time_before_total = time.time()
         batch_size, orig_height, orig_width, orig_depth = images_batch.shape
         self.batch_size = batch_size
-        padded = numpy.pad(images_batch, ((0, 0),(self.padding, self.padding), (self.padding, self.padding), (0,0)), mode='constant')
+        padded = numpy.pad(images_batch, ((0, 0), (self.padding, self.padding), (self.padding, self.padding), (0, 0)),
+                           mode='constant')
         self.input = padded
         self.original_images = images_batch
-        batch_size, orig_height, orig_width, orig_depth= images_batch.shape
-        time_before_im2col= time.time()
+        batch_size, orig_height, orig_width, orig_depth = images_batch.shape
+        time_before_im2col = time.time()
         patch_matrix = (self.im2col(padded))
         time_after_im2col = time.time()
         weights_matrix, bias_matrix = self.full_weights_matrix()
         self.weights = weights_matrix
         results = numpy.matmul(weights_matrix, patch_matrix) + bias_matrix
-        reshaped_results = results.reshape(self.num_of_filters, batch_size, orig_height, orig_width,)
+        reshaped_results = results.reshape(self.num_of_filters, batch_size, orig_height, orig_width, )
         transposed_results = numpy.transpose(reshaped_results, (1, 2, 3, 0))
 
         self.patch_matrix = patch_matrix
@@ -343,8 +346,8 @@ class CONV_Layer:
         batch_size, height, width, depth = dOutput.shape
         dBias = []
         for id in range(0, self.num_of_filters):
-            dBias.append(numpy.sum(dOutput[:, :, :, id], axis = (0,1,2)))
-        dBias = numpy.array(dBias)
+            dBias.append(numpy.sum(dOutput[:, :, :, id], axis=(0, 1, 2)))
+        dBias = numpy.array(dBias) / dOutput.shape[0]
         dOutput_Transposed = numpy.transpose(dOutput, (3, 0, 1, 2))
         dOutput_reshaped = numpy.reshape(dOutput_Transposed, (self.num_of_filters, -1))
         patch_matrix = self.patch_matrix
@@ -352,7 +355,8 @@ class CONV_Layer:
         dWeights = numpy.matmul(dOutput_reshaped, transposed_patch_matrix) / batch_size
         input_to_col2im_reshaped = numpy.matmul(numpy.transpose(weights), dOutput_reshaped)
         total_patches = height * width * batch_size
-        input_to_col2im = input_to_col2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth, total_patches)
+        input_to_col2im = input_to_col2im_reshaped.reshape(self.kernel_size, self.kernel_size, self.input_depth,
+                                                           total_patches)
         self.classifier.gradients[self.id] = {
             "weights": dWeights,
             "bias": dBias
@@ -365,12 +369,12 @@ class CONV_Layer:
         return dInput
 
 
-
 class Flatten_Layer:
     def __init__(self, classifier):
         self.id = classifier.layer_ids[-1] + 1
         classifier.layer_ids.append(self.id)
         self.type = "Flatten_Layer"
+
     def forward_pass(self, input):
         self.input_shape = input.shape
         flattened = input.reshape(input.shape[0], -1)
@@ -380,11 +384,12 @@ class Flatten_Layer:
         dOutput_3d = numpy.reshape(dOutput_flat, self.input_shape)
         return dOutput_3d
 
+
 def get_random_hyperparams():
-    LR_LB = 0.0003 #lower bound/upper bound
+    LR_LB = 0.0003  #lower bound/upper bound
     LR_UB = 0.003
     default_LR = 0.001
-    LR_range_test = True #Set this to true if you want to be checking the LR range.
+    LR_range_test = True  #Set this to true if you want to be checking the LR range.
     batch_size_options = [65, 130]
     default_batch_size = 130
     batch_size_test = True
@@ -396,7 +401,8 @@ def get_random_hyperparams():
     default_filter_sizes = (32, 64, 128)
     filter_size_test = True
     #Here, the first number per tuple is the type of decay. 0 = no decay, 1 = linear, 2 = exponential. The second number is the rate (where applicable), and the third is the step size (where applicable)
-    learning_rate_decay_options = [(0, 0, 0), (1, 0.95, 5), (1, 0.9, 5), (1, 0.8, 5), (2, 0.96, 0), (2, 0.93, 0), (2, 0.9, 0) ]
+    learning_rate_decay_options = [(0, 0, 0), (1, 0.95, 5), (1, 0.9, 5), (1, 0.8, 5), (2, 0.96, 0), (2, 0.93, 0),
+                                   (2, 0.9, 0)]
     LR_decay_test = False
     LR_decay_default = learning_rate_decay_options[0]
     random_LR = random.uniform(LR_LB, LR_UB)
@@ -440,6 +446,7 @@ class Adam_Optimiser:
 
         self.m = {}
         self.v = {}
+
     def zero_gradients(self, layers):
         for layer in layers:
             if layer.type == "Linear Layer":
@@ -464,8 +471,6 @@ class Adam_Optimiser:
                     "bias": numpy.zeros_like(bias_vector)
                 }
 
-
-
     def step(self, gradients):
         self.timestep = self.timestep + 1
         for layer in self.layers:
@@ -477,11 +482,12 @@ class Adam_Optimiser:
                 dWeights = gradients[layer.id]["weights"]
                 dBias = gradients[layer.id]["bias"]
 
-                m_weights = self.beta1 * m_weights+ (1 - self.beta1) * dWeights
+                m_weights = self.beta1 * m_weights + (1 - self.beta1) * dWeights
                 v_weights = self.beta2 * v_weights + (1 - self.beta2) * (dWeights ** 2)
                 m_weights_protected = m_weights / (1 - self.beta1 ** self.timestep)
                 v_weights_protected = v_weights / (1 - self.beta2 ** self.timestep)
-                layer.weights = layer.weights - (self.learning_rate * m_weights_protected) / (numpy.sqrt(v_weights_protected) + self.eps)
+                layer.weights = layer.weights - (self.learning_rate * m_weights_protected) / (
+                            numpy.sqrt(v_weights_protected) + self.eps)
                 self.m[layer.id]["weights"] = m_weights
                 self.v[layer.id]["weights"] = v_weights
 
@@ -508,10 +514,12 @@ class Adam_Optimiser:
                 m_weights_protected = m_weights / (1 - self.beta1 ** self.timestep)
                 v_weights_protected = v_weights / (1 - self.beta2 ** self.timestep)
 
-                weight_updates = - (self.learning_rate * m_weights_protected) / (numpy.sqrt(v_weights_protected) + self.eps)
+                weight_updates = - (self.learning_rate * m_weights_protected) / (
+                            numpy.sqrt(v_weights_protected) + self.eps)
 
                 for filter_id in range(0, layer.num_of_filters):
-                    weight_update_for_filter = weight_updates[filter_id].reshape(layer.kernel_size, layer.kernel_size, layer.input_depth)
+                    weight_update_for_filter = weight_updates[filter_id].reshape(layer.kernel_size, layer.kernel_size,
+                                                                                 layer.input_depth)
                     layer.filters[filter_id]["weights"] = layer.filters[filter_id]["weights"] + weight_update_for_filter
 
                 self.m[layer.id]["weights"] = m_weights
@@ -529,16 +537,17 @@ class Adam_Optimiser:
 
                 self.m[layer.id]["bias"] = m_bias
                 self.v[layer.id]["bias"] = v_bias
+
+
 def SVM_loss_single_image(answers, ground_truth):
     correct_score = answers[ground_truth]
     total_loss = 0
     margin = 1
     violating_classes = 0
     correct = False
-    dLoss = numpy.zeros((len(answers))) #dLoss/dAnswers
+    dLoss = numpy.zeros((len(answers)))  #dLoss/dAnswers
 
-
-    for index in range (0, len(answers)):
+    for index in range(0, len(answers)):
         if answers[index] - correct_score + margin > 0 and index != ground_truth:
             violating_classes = violating_classes - 1
             dLoss[index] = 1
@@ -552,12 +561,14 @@ def SVM_loss_single_image(answers, ground_truth):
 
     return total_loss, dLoss, correct
 
-def batched_SVM(answers_batch, ground_truths_batch): #Answers has shape (batch_size, 62). ground_truth has shape (batch_size)
+
+def batched_SVM(answers_batch,
+                ground_truths_batch):  #Answers has shape (batch_size, 62). ground_truth has shape (batch_size)
     total_loss = 0
     all_dLoss = []
     total_correct = 0
     batch_size = len(answers_batch)
-    for image in range (0, batch_size):
+    for image in range(0, batch_size):
         answers = answers_batch[image]
         ground_truth = ground_truths_batch[image]
         loss, dLoss, correct = SVM_loss_single_image(answers, ground_truth)
@@ -566,7 +577,7 @@ def batched_SVM(answers_batch, ground_truths_batch): #Answers has shape (batch_s
         if correct:
             total_correct = total_correct + 1
 
-    average_loss = total_loss/batch_size
+    average_loss = total_loss / batch_size
     all_dLoss_matrix = numpy.stack(all_dLoss)
     return average_loss, all_dLoss_matrix, total_correct
 
@@ -575,19 +586,22 @@ def LR_decay(LR_decay_hyperparam, initial_LR, epoch):
     type_of_decay = LR_decay_hyperparam[0]
     rate_of_decay = LR_decay_hyperparam[1]
     step_size_of_decay = LR_decay_hyperparam[2]
-    if type_of_decay == 0: #No LR
+    if type_of_decay == 0:  #No LR
         return initial_LR
-    if type_of_decay == 1: #Linear Decay
-        return initial_LR * rate_of_decay ** (epoch/step_size_of_decay)
-    if type_of_decay == 2: #Exponential Decay
+    if type_of_decay == 1:  #Linear Decay
+        return initial_LR * rate_of_decay ** (epoch / step_size_of_decay)
+    if type_of_decay == 2:  #Exponential Decay
         return initial_LR * math.e ** -(rate_of_decay * epoch)
+
 
 def write_new_line_to_file(filename, line):
     filepath_source = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\training data runs"
     filepath = os.path.join(filepath_source, filename)
     with open(filepath, "a") as file:
         file.write(line + "\n")
-class Classification_Model_NEW():
+
+
+class Classification_Model_NEW:
     def __init__(self, hyperparams):
         print(hyperparams)
         # write_new_line_to_file("night of 28-1", f"LR = {hyperparams[0]}, batch_size = {hyperparams[1]}, L2_strength = {hyperparams[2]}, filter_sizes = {hyperparams[3]}, LR decay = {hyperparams[4]}")
@@ -631,21 +645,25 @@ class Classification_Model_NEW():
             total_correct = 0
             total_EMNIST_images = 30000
             total_maths_images = 9000
-            total_images = total_EMNIST_images + total_maths_images #39000
+            total_images = total_EMNIST_images + total_maths_images  #39000
             self.batch_size = self.hyperparams[1]
             batch_size = self.batch_size
             # maths_per_batch = int(batch_size *3/13)
             # EMNIST_per_batch = int(batch_size *10/13)
-            update_after_n_batches = 1
+            update_after_n_batches = 25
             loss_total = 0
             little_batch_size = batch_size
-            big_batch_size = 100 * little_batch_size #13000
+            big_batch_size = 100 * little_batch_size  #13000
             #For provided parameters, 3 big batches, each with 100 little batches
-            for big_batch in range(0, total_images//(little_batch_size*100)):
+            for big_batch in range(0, total_images // (little_batch_size * 100)):
                 maths_per_big_batch = int(big_batch_size * 3 / 13)
                 EMNIST_per_big_batch = int(big_batch_size * 10 / 13)
                 time_before_big_loading = time.time()
-                training_images, training_labels = get_full_set(maths_starting=maths_per_big_batch * big_batch, maths_finishing=maths_per_big_batch * (big_batch+1), EMNIST_starting=EMNIST_per_big_batch * big_batch, EMNIST_finishing=EMNIST_per_big_batch * (big_batch + 1), training_or_testing="training")
+                training_images, training_labels = get_full_set(maths_starting=maths_per_big_batch * big_batch,
+                                                                maths_finishing=maths_per_big_batch * (big_batch + 1),
+                                                                EMNIST_starting=EMNIST_per_big_batch * big_batch,
+                                                                EMNIST_finishing=EMNIST_per_big_batch * (big_batch + 1),
+                                                                training_or_testing="training")
                 shuffled_indices = (list(range(0, len(training_images))))
                 random.shuffle(shuffled_indices)
                 loaded_batch_images = training_images[shuffled_indices]
@@ -655,13 +673,16 @@ class Classification_Model_NEW():
                 print("big_loading", round(time_for_big_loading, 3))
                 for little_batch in range(0, 100):
                     time_before_loading_data = time.time()
-                    images_per_batch =loaded_batch_images[little_batch*little_batch_size: (little_batch+1)*little_batch_size]
-                    labels_per_batch =loaded_batch_labels[little_batch*little_batch_size: (little_batch+1)*little_batch_size]
+                    images_per_batch = loaded_batch_images[
+                        little_batch * little_batch_size: (little_batch + 1) * little_batch_size]
+                    labels_per_batch = loaded_batch_labels[
+                        little_batch * little_batch_size: (little_batch + 1) * little_batch_size]
                     forward = images_per_batch
                     ground_truth = labels_per_batch
                     time_after_loading_data = time.time()
                     if little_batch % update_after_n_batches == 0:
-                        print(f"Epoch {epoch}, Batch Number {little_batch}/{99} of big batch {big_batch}/{total_images//(little_batch_size*100)-1}")
+                        print(
+                            f"Epoch {epoch}, Batch Number {little_batch}/{99} of big batch {big_batch}/{total_images // (little_batch_size * 100) - 1}")
                     time_at_batch_start = time.time()
                     time_before_layer_declaration = time.time()
                     for layer in self.layers:
@@ -710,7 +731,6 @@ class Classification_Model_NEW():
                         # time_for_layer = time_after_layer - time_before_layer
                         # print("Layer", layer.id, time_for_layer)
 
-
                     time_after_backprop = time.time()
                     time_for_backprop = time_after_backprop - time_before_backprop
                     time_before_optimiser_step = time.time()
@@ -720,30 +740,35 @@ class Classification_Model_NEW():
                         elif layer.type == "CONV_Layer":
                             weights_matrix, bias_matrix = layer.full_weights_matrix()
                             self.gradients[layer.id]["weights"] += self.L2_lambda * weights_matrix
+                    self.optimiser.step(self.gradients)
                     time_after_optimiser_step = time.time()
-                    time_for_optimiser_step = time_after_optimiser_step-time_before_optimiser_step
+                    time_for_optimiser_step = time_after_optimiser_step - time_before_optimiser_step
                     time_at_batch_end = time.time()
                     if little_batch % update_after_n_batches == 0:
-                        print(f"Time for Batch = {round(time_at_batch_end - time_at_batch_start, 5)}, time per image = {round(((time_at_batch_end - time_at_batch_start)/batch_size), 5)}")
-                        print("data_loading", round(time_after_loading_data-time_before_loading_data, 3))
+                        print(
+                            f"Time for Batch = {round(time_at_batch_end - time_at_batch_start, 5)}, time per image = {round(((time_at_batch_end - time_at_batch_start) / batch_size), 5)}")
+                        print("data_loading", round(time_after_loading_data - time_before_loading_data, 3))
                         print("layer_declaration", round(time_for_layer_declaration, 3))
                         print("forward_pass", round(time_for_forward_pass, 3))
                         print("L2", round(time_for_L2, 3))
                         print("backprop", round(time_for_backprop, 3))
                         print("optimiser_step", round(time_for_optimiser_step, 3))
+                        print("Loss", loss)
 
         return self.accuracy_check()
 
     def save_parameters(self):
         for layer in self.layers:
-            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
+            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(
+                layer.id)
             with open(filename, "wb") as file:
                 pickle.dump(layer, file)
 
     def load_parameters(self):
         layers_with_params = []
         for layer in self.layers:
-            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
+            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(
+                layer.id)
             with open(filename, "rb") as file:
                 layer = pickle.load(file)
                 layers_with_params.append(layer)
@@ -755,23 +780,26 @@ class Classification_Model_NEW():
         correct_counter = 0
         #Onle one of the following lines should be uncommented. The top one uses the testing set, the bottom one uses the validation set.
         #testing_images, testing_labels = get_full_set(0, 24000, 0, 80000, "testing")
-        testing_images, testing_labels = get_full_set(182000, 208000, 600000, 697000, "training")
-        for batch in range (0, 800):
-            starting_index = batch*130
-            finishing_index = (batch+1)*130
+        testing_images, testing_labels = get_full_set(182000, 206000, 600000, 680000, "training")
+        print("loading finished")
+        for batch in range(0, len(testing_labels) // 130):
+            if batch % 1 == 0:
+                print(batch)
+            starting_index = batch * 130
+            finishing_index = (batch + 1) * 130
             forward = testing_images[starting_index:finishing_index]
             labels = testing_labels[starting_index:finishing_index]
             for layer in self.layers:
                 forward = layer.forward_pass(forward)
             predictions = numpy.argmax(forward, axis=1)
-            # print(predictions.shape)
+            print(predictions.shape)
             for prediction_index in range(0, 130):
                 prediction = predictions[prediction_index]
                 label = labels[prediction_index]
                 if prediction == label:
                     correct_counter = correct_counter + 1
         time_after_accuracy_check = time.time()
-        time_for_accuracy_check = time_after_accuracy_check-time_before_accuracy_check
+        time_for_accuracy_check = time_after_accuracy_check - time_before_accuracy_check
         print("Accuracy check", round(time_for_accuracy_check, 3))
         return round((correct_counter / len(testing_images) * 100), 3)
 
@@ -780,8 +808,9 @@ class Classification_Model_NEW():
         for layer in self.layers:
             forward = layer.forward_pass(forward)
         prediction = numpy.argmax(forward)
-        certainty = numpy.argmax(forward) #THIS CODE ISN'T FINISHED YET
+        certainty = numpy.argmax(forward)  #THIS CODE ISN'T FINISHED YET
         return prediction, certainty
+
 
 # hyperparam_list = []
 # for hyperparam_set_number in range(0, 25): #This code is currently commented as it does not need to be run more than once.
@@ -810,4 +839,8 @@ def get_progress():
 
 
 get_progress()
-##
+
+# images, labels = get_full_set(0, 10, 0, 30, "training")
+#
+# for image_index in range(len(images)):
+#     view_numpy_as_jpg(filepath=None, numpy_file=images[image_index], label=numbers_to_labels[labels[image_index]])

@@ -3,6 +3,7 @@ import numpy
 import time
 import json
 import tensorflow_datasets
+import random
 from helper_functions import scale_array_to_0_to_1
 base_maths = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq"
 
@@ -59,7 +60,7 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         training_labels = []
         for image, label in training_dataset:
             image = numpy.array(image)
-            scaled = scale_array_to_0_to_1(image)
+            scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))
             training_images.append(reshaped)
@@ -78,7 +79,7 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         testing_labels = []
         for image, label in testing_dataset:
             image = numpy.array(image)
-            scaled = scale_array_to_0_to_1(image)
+            scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))
             testing_images.append(reshaped)
@@ -93,6 +94,10 @@ def get_full_set(maths_starting, maths_finishing, EMNIST_starting, EMNIST_finish
     EMNIST_images_matrix, EMNIST_labels_matrix = get_EMNIST_images(EMNIST_starting, EMNIST_finishing, training_or_testing)
     final_images_matrix = numpy.concatenate([maths_images_matrix, EMNIST_images_matrix])
     final_labels_matrix = numpy.concatenate([maths_labels_matrix, EMNIST_labels_matrix])
-    return final_images_matrix, final_labels_matrix
+    shuffled_indices = list(range(0, len(final_images_matrix)))
+    random.shuffle(shuffled_indices)
+    final_labels_matrix_shuffled = final_labels_matrix[shuffled_indices]
+    final_images_matrix_shuffled = final_images_matrix[shuffled_indices]
+    return final_images_matrix_shuffled, final_labels_matrix_shuffled
 
 

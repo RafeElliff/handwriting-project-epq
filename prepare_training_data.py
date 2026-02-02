@@ -23,7 +23,7 @@ def rename_and_move_images():#This code renames all the images to have the forma
             fortyfive_fortyfive_image = cv2.imread(source_path)
             gray_image = cv2.cvtColor(fortyfive_fortyfive_image, cv2.COLOR_BGR2GRAY)
             twentyeight_twentyeight_image = resize_to_28_x_28(gray_image)
-            colour_scaled_image = scale_array_to_0_to_1(twentyeight_twentyeight_image)
+            colour_scaled_image = scale_array_to_0_to_1(twentyeight_twentyeight_image, inverse=True)
             numpy.save(new_path, colour_scaled_image)
 
 labels_to_numbers = {
@@ -201,7 +201,7 @@ numbers_to_labels = {
 
 number_of_images = 234647
 
-
+# #
 # shuffled_indices = list(range(0, 234646))
 # random.shuffle(shuffled_indices)
 # with open(os.path.join(base_maths, "shuffled_indices.json"), "w") as file:
@@ -259,8 +259,9 @@ def check_progress():
     return remaining_indices
 
 
-# rename_and_move_images()
-# produce_random_ordering_and_labels()
-# id = 4
-# view_numpy_as_jpg(filepath = os.path.join(base_maths, "training_images", f"{id}.npy"), numpy_file = None, label = "test" )
-# print()
+rename_and_move_images()
+produce_random_ordering_and_labels()
+# for image_id in os.listdir(os.path.join(base_maths, "28_x_28_images")):
+#     view_numpy_as_jpg(filepath = os.path.join(base_maths, "28_x_28_images", image_id), numpy_file = None, label = "test")
+#     print(image_id)
+#     print(numpy.load(os.path.join(base_maths, "28_x_28_images", image_id)))
