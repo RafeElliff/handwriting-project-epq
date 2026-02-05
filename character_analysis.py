@@ -203,8 +203,10 @@ class Linear_Layer:
         self.num_of_inputs = num_of_inputs
         self.num_of_neurons = num_of_neurons
         weights = numpy.random.randn(num_of_inputs, num_of_neurons).astype(numpy.float32) * math.sqrt(2 / num_of_inputs)
+        # weights = numpy.random.randn(num_of_inputs, num_of_neurons) * math.sqrt(2 / num_of_inputs)
         self.weights = weights
         self.bias = numpy.zeros(num_of_neurons, dtype=numpy.float32)
+        # self.bias = numpy.zeros(num_of_neurons)
         self.input = None
         self.type = "Linear Layer"
         self.id = classifier.layer_ids[-1] + 1
@@ -265,8 +267,8 @@ class CONV_Layer:
         self.filters = {}
         num_of_filters = self.num_of_filters
         for filter in range(0, num_of_filters):
-            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth).astype(numpy.float32) * math.sqrt(
-                2 / self.num_of_filters)
+            weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth).astype(numpy.float32) * math.sqrt(2 / self.num_of_filters)
+            # weights = numpy.random.randn(self.kernel_size, self.kernel_size, self.input_depth) * math.sqrt(2 / self.num_of_filters)
             bias = 0
             self.filters[filter] = {
                 "weights": weights,
@@ -293,6 +295,8 @@ class CONV_Layer:
         padded_forward_pass = self.input
         original_image = self.original_images
         dInput_padded = numpy.zeros_like(padded_forward_pass, dtype=numpy.float32)
+        # dInput_padded = numpy.zeros_like(padded_forward_pass)
+
         batch_size, height_orig, width_orig, depth_orig = original_image.shape
 
         col_reshaped = four_d_matrix.reshape(
@@ -324,6 +328,8 @@ class CONV_Layer:
             full_bias_list.append(bias_for_id)
         weights_numpy = numpy.array(full_weights_list, dtype=numpy.float32)
         bias_vector = numpy.array(full_bias_list, dtype=numpy.float32)
+        # weights_numpy = numpy.array(full_weights_list)
+        # bias_vector = numpy.array(full_bias_list)
         bias_matrix = bias_vector.reshape(self.num_of_filters, 1)
         return weights_numpy, bias_matrix
 
@@ -359,6 +365,7 @@ class CONV_Layer:
         for id in range(0, self.num_of_filters):
             dBias.append(numpy.sum(dOutput[:, :, :, id], axis=(0, 1, 2)))
         dBias = numpy.array(dBias, dtype=numpy.float32) / dOutput.shape[0]
+        # dBias = numpy.array(dBias) / dOutput.shape[0]
         dOutput_Transposed = numpy.transpose(dOutput, (3, 0, 1, 2))
         dOutput_reshaped = numpy.reshape(dOutput_Transposed, (self.num_of_filters, -1))
         patch_matrix = self.patch_matrix
@@ -472,10 +479,14 @@ class Adam_Optimiser:
                 self.m[layer.id] = {
                     "weights": numpy.zeros_like(layer.weights, dtype=numpy.float32),
                     "bias": numpy.zeros_like(layer.bias, dtype=numpy.float32)
+                    # "weights": numpy.zeros_like(layer.weights),
+                    # "bias": numpy.zeros_like(layer.bias)
                 }
                 self.v[layer.id] = {
                     "weights": numpy.zeros_like(layer.weights, dtype=numpy.float32),
                     "bias": numpy.zeros_like(layer.bias, dtype=numpy.float32)
+                    # "weights": numpy.zeros_like(layer.weights),
+                    # "bias": numpy.zeros_like(layer.bias)
                 }
             elif layer.type == "CONV_Layer":
                 weights_matrix, bias_matrix = layer.full_weights_matrix()
@@ -483,10 +494,14 @@ class Adam_Optimiser:
                 self.m[layer.id] = {
                     "weights": numpy.zeros_like(weights_matrix, dtype=numpy.float32),
                     "bias": numpy.zeros_like(bias_vector,dtype=numpy.float32)
+                    # "weights": numpy.zeros_like(weights_matrix),
+                    # "bias": numpy.zeros_like(bias_vector)
                 }
                 self.v[layer.id] = {
                     "weights": numpy.zeros_like(weights_matrix, dtype=numpy.float32),
                     "bias": numpy.zeros_like(bias_vector, dtype=numpy.float32)
+                    # "weights": numpy.zeros_like(weights_matrix),
+                    # "bias": numpy.zeros_like(bias_vector)
                 }
 
     def step(self, gradients):
@@ -563,7 +578,7 @@ def SVM_loss_single_image(answers, ground_truth):
     margin = 1
     violating_classes = 0
     correct = False
-    dLoss = numpy.zeros((len(answers)), dtype=numpy.float32)  #dLoss/dAnswers
+    dLoss = numpy.zeros((len(answers))).astype(numpy.float32)  #dLoss/dAnswers
 
     for index in range(0, len(answers)):
         if answers[index] - correct_score + margin > 0 and index != ground_truth:
@@ -644,14 +659,14 @@ class Classification_Model_NEW:
         ]
         self.layers = layers
         self.L2_lambda = hyperparams[2]
-        self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 0.00000001)
+        self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 1e-7)
         self.optimiser.zero_gradients(layers)
         self.best_accuracy = 0
         self.epoch_with_best_accuracy = -1
         self.gradients = {}
 
     def train(self):
-        self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 0.00000001)
+        self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 1e-7)
         self.optimiser.zero_gradients(self.layers)
         self.gradients = {}
         for epoch in range(0, 8):
@@ -671,9 +686,9 @@ class Classification_Model_NEW:
             update_after_n_batches = 25
             loss_total = 0
             little_batch_size = batch_size
-            big_batch_size = 100 * little_batch_size  #13000
+            big_batch_size = 50 * little_batch_size  #13000
             #For provided parameters, 3 big batches, each with 100 little batches
-            for big_batch in range(0, total_images // (little_batch_size * 100)):
+            for big_batch in range(0, total_images // (big_batch_size)):
                 maths_per_big_batch = int(big_batch_size * 3 / 13)
                 EMNIST_per_big_batch = int(big_batch_size * 10 / 13)
                 time_before_big_loading = time.time()
@@ -689,7 +704,7 @@ class Classification_Model_NEW:
                 time_after_big_loading = time.time()
                 time_for_big_loading = time_after_big_loading - time_before_big_loading
                 print("big_loading", round(time_for_big_loading, 3))
-                for little_batch in range(0, 100):
+                for little_batch in range(0, 50):
                     time_before_loading_data = time.time()
                     images_per_batch = loaded_batch_images[
                         little_batch * little_batch_size: (little_batch + 1) * little_batch_size]
@@ -700,7 +715,7 @@ class Classification_Model_NEW:
                     time_after_loading_data = time.time()
                     if little_batch % update_after_n_batches == 0:
                         print(
-                            f"Epoch {epoch}, Batch Number {little_batch}/{99} of big batch {big_batch}/{total_images // (little_batch_size * 100) - 1}")
+                            f"Epoch {epoch}, Batch Number {little_batch}/{49} of big batch {big_batch}/{total_images // (little_batch_size * 49) - 1}")
                     time_at_batch_start = time.time()
                     time_before_layer_declaration = time.time()
                     for layer in self.layers:
@@ -807,7 +822,7 @@ class Classification_Model_NEW:
         maths_per_big_batch = 1500
         EMNIST_per_big_batch = 5000
         big_batch_size = 6500
-        for big_batch_start in range(0, (total_images//big_batch_size)-1):
+        for big_batch_start in range(0, (total_images//big_batch_size)):
             testing_images, testing_labels = get_full_set(182000 + (big_batch_start)*maths_per_big_batch, 182000 + (big_batch_start+1)*maths_per_big_batch, 600000 + big_batch_start*EMNIST_per_big_batch, 600000 + (big_batch_start + 1)*EMNIST_per_big_batch, "training")
 
             print("loading finished")
@@ -831,7 +846,7 @@ class Classification_Model_NEW:
 
                     prediction_as_letter = numbers_to_labels[prediction]
                     label_as_letter = numbers_to_labels[label]
-                    possible_confusables = get_similar_letters(prediction)
+                    possible_confusables = get_similar_letters(prediction_as_letter)
                     if label_as_letter in possible_confusables:
                         confusable_correct_counter = confusable_correct_counter+1
         time_after_accuracy_check = time.time()

@@ -62,6 +62,7 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         training_labels = []
         for image, label in training_dataset:
             image = numpy.array(image, dtype=numpy.float32)
+            # image = numpy.array(image)
             scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))
@@ -80,7 +81,8 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         testing_images = []
         testing_labels = []
         for image, label in testing_dataset:
-            image = numpy.array(image)
+            image = numpy.array(image, dtype=numpy.float32)
+            # image = numpy.array(image)
             scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))
