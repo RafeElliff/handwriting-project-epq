@@ -17,7 +17,7 @@ def get_maths_images(starting_index, finishing_index, training_or_testing):
         list_of_numpys = []
         for image_name in images_to_add:
             image_numpy = numpy.load(os.path.join(base_maths, "training_images", image_name))
-            image_numpy = image_numpy.astype(numpy.float32)
+            # image_numpy = image_numpy.astype(numpy.float32)
             list_of_numpys.append(image_numpy)
         images_matrix = numpy.stack(list_of_numpys)
         images_matrix = images_matrix.reshape(batch_size, 28, 28, 1)
@@ -32,7 +32,7 @@ def get_maths_images(starting_index, finishing_index, training_or_testing):
         list_of_numpys = []
         for image_name in images_to_add:
             image_numpy = numpy.load(os.path.join(base_maths, "testing_images", image_name))
-            image_numpy = image_numpy.astype(numpy.float32)
+            # image_numpy = image_numpy.astype(numpy.float32)
             list_of_numpys.append(image_numpy)
         images_matrix = numpy.stack(list_of_numpys)
         images_matrix = images_matrix.reshape(batch_size, 28, 28, 1)
@@ -61,8 +61,8 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         training_images = []
         training_labels = []
         for image, label in training_dataset:
-            image = numpy.array(image, dtype=numpy.float32)
-            # image = numpy.array(image)
+            # image = numpy.array(image, dtype=numpy.float32)
+            image = numpy.array(image)
             scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))
@@ -81,8 +81,8 @@ def get_EMNIST_images(starting_index, finishing_index, training_or_testing):
         testing_images = []
         testing_labels = []
         for image, label in testing_dataset:
-            image = numpy.array(image, dtype=numpy.float32)
-            # image = numpy.array(image)
+            # image = numpy.array(image, dtype=numpy.float32)
+            image = numpy.array(image)
             scaled = scale_array_to_0_to_1(image, inverse=False)
             transposed = numpy.transpose(scaled)
             reshaped = numpy.reshape(transposed, (28, 28, 1))

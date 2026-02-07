@@ -411,25 +411,25 @@ class Flatten_Layer:
 
 
 def get_random_hyperparams():
-    LR_LB = 0.0003  #lower bound/upper bound
-    LR_UB = 0.003
-    default_LR = 0.001
-    LR_range_test = True  #Set this to true if you want to be checking the LR range.
-    batch_size_options = [65, 130]
+    LR_LB = 0.0002 #lower bound/upper bound
+    LR_UB = 0.0005
+    default_LR = 0.00035
+    LR_range_test = False  #Set this to true if you want to be checking the LR range.
+    batch_size_options = [260, 130]
     default_batch_size = 130
-    batch_size_test = True
+    batch_size_test = False
     L2_LB = 0.01
     L2_UB = 0.1
-    default_L2 = 0.01
-    L2_range_test = True
+    default_L2 = 0.03
+    L2_range_test = False
     possible_filter_sizes = [(16, 32, 64), (32, 48, 64), (32, 64, 128)]
-    default_filter_sizes = (32, 64, 128)
-    filter_size_test = True
+    default_filter_sizes = (32, 48, 64)
+    filter_size_test = False
     #Here, the first number per tuple is the type of decay. 0 = no decay, 1 = linear, 2 = exponential. The second number is the rate (where applicable), and the third is the step size (where applicable)
     learning_rate_decay_options = [(0, 0, 0), (1, 0.95, 5), (1, 0.9, 5), (1, 0.8, 5), (2, 0.96, 0), (2, 0.93, 0),
                                    (2, 0.9, 0)]
     LR_decay_test = False
-    LR_decay_default = learning_rate_decay_options[0]
+    LR_decay_default = learning_rate_decay_options[5]
     random_LR = random.uniform(LR_LB, LR_UB)
     random_L2 = random.uniform(L2_LB, L2_UB)
     random_batch_size = random.choice(batch_size_options)
@@ -579,6 +579,7 @@ def SVM_loss_single_image(answers, ground_truth):
     violating_classes = 0
     correct = False
     dLoss = numpy.zeros((len(answers))).astype(numpy.float32)  #dLoss/dAnswers
+    # dLoss = numpy.zeros((len(answers)))  #dLoss/dAnswers
 
     for index in range(0, len(answers)):
         if answers[index] - correct_score + margin > 0 and index != ground_truth:
@@ -622,9 +623,9 @@ def LR_decay(LR_decay_hyperparam, initial_LR, epoch):
     if type_of_decay == 0:  #No LR
         return initial_LR
     if type_of_decay == 1:  #Linear Decay
-        return initial_LR * rate_of_decay ** (epoch / step_size_of_decay)
+        return initial_LR * rate_of_decay ** (epoch // step_size_of_decay)
     if type_of_decay == 2:  #Exponential Decay
-        return initial_LR * math.e ** -(rate_of_decay * epoch)
+        return initial_LR * rate_of_decay ** epoch
 
 
 def write_new_line_to_file(filename, line):
@@ -659,25 +660,25 @@ class Classification_Model_NEW:
         ]
         self.layers = layers
         self.L2_lambda = hyperparams[2]
-        self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 1e-7)
+        self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 1e-8)
         self.optimiser.zero_gradients(layers)
         self.best_accuracy = 0
-        self.epoch_with_best_accuracy = -1
+        self.epochs_without_improvement = 0
         self.gradients = {}
 
     def train(self):
-        self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 1e-7)
+        self.optimiser = Adam_Optimiser(self.hyperparams[0], self.layers, 0.9, 0.999, 1e-8)
         self.optimiser.zero_gradients(self.layers)
         self.gradients = {}
-        for epoch in range(0, 8):
+        for epoch in range(0, 35):
             self.decayed_LR = LR_decay(self.hyperparams[4], self.hyperparams[0], epoch)
             self.optimiser.learning_rate = self.decayed_LR
             time_tuple = time.localtime()
             time_at_start = str(time_tuple[3]) + ":" + str(time_tuple[4]) + ":" + str(time_tuple[5])
-            print(f"time at start of epoch {epoch} = {time_at_start}")
+            print(f"time at start of epoch {epoch} = {time_at_start}, lr at epoch = {self.decayed_LR}")
             total_correct = 0
-            total_EMNIST_images = 30000
-            total_maths_images = 9000
+            total_EMNIST_images = 690000
+            total_maths_images = 207000
             total_images = total_EMNIST_images + total_maths_images  #39000
             self.batch_size = self.hyperparams[1]
             batch_size = self.batch_size
@@ -715,7 +716,7 @@ class Classification_Model_NEW:
                     time_after_loading_data = time.time()
                     if little_batch % update_after_n_batches == 0:
                         print(
-                            f"Epoch {epoch}, Batch Number {little_batch}/{49} of big batch {big_batch}/{total_images // (little_batch_size * 49) - 1}")
+                            f"Epoch {epoch}, Batch Number {little_batch}/{49} of big batch {big_batch}/{total_images // (little_batch_size * 50) - 1}")
                     time_at_batch_start = time.time()
                     time_before_layer_declaration = time.time()
                     for layer in self.layers:
@@ -791,45 +792,69 @@ class Classification_Model_NEW:
                     del images_per_batch, labels_per_batch
                     del dLoss, loss
                 del loaded_batch_images, loaded_batch_labels
-
-        return self.accuracy_check()
+            accuracies = self.validation_accuracy_check()
+            accuracy = accuracies[0]
+            print(accuracy)
+            if accuracy > self.best_accuracy:
+                self.epochs_without_improvement = 0
+                self.best_accuracy = accuracy
+                self.save_parameters()
+            else:
+                self.epochs_without_improvement = self.epochs_without_improvement + 1
+            if self.epochs_without_improvement > 3:
+                # final_return = (epoch-self.epochs_without_improvement, self.best_accuracy)
+                return None
+        # final_return = (24 - self.epochs_without_improvement, self.best_accuracy)
+        # return final_return
 
     def save_parameters(self):
         for layer in self.layers:
-            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(
-                layer.id)
-            with open(filename, "wb") as file:
-                pickle.dump(layer, file)
+            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
+            if layer.type == "Linear Layer":
+                data_to_save = {
+                    "type": layer.type,
+                    "weights": layer.weights,
+                    "bias": layer.bias
+                }
+            elif layer.type == "CONV_Layer":
+                data_to_save = {
+                    "type": layer.type,
+                    "filters": layer.filters
+                }
+            else:
+                data_to_save = {"type": layer.type}
+
+            with open (filename, "wb") as file:
+                pickle.dump(data_to_save, file)
 
     def load_parameters(self):
-        layers_with_params = []
         for layer in self.layers:
-            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(
-                layer.id)
+            filename = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\trained_model_data\layer_" + str(layer.id)
             with open(filename, "rb") as file:
-                layer = pickle.load(file)
-                layers_with_params.append(layer)
-        self.layers = layers_with_params
-        return layers_with_params
+                saved_data = pickle.load(file)
+            if layer.type == "Linear Layer":
+                layer.weights = saved_data["weights"]
+                layer.bias = saved_data["bias"]
+            elif layer.type == "CONV_Layer":
+                layer.filters = saved_data["filters"]
 
-    def accuracy_check(self):
+    def testing_accuracy_check(self):
         time_before_accuracy_check = time.time()
         correct_counter = 0
         confusable_correct_counter = 0
-        #Onle one of the following lines should be uncommented. The top one uses the testing set, the bottom one uses the validation set.
-        #testing_images, testing_labels = get_full_set(0, 24000, 0, 80000, "testing")
-        total_images = 104000
+
+        total_images = 97500
         maths_per_big_batch = 1500
         EMNIST_per_big_batch = 5000
         big_batch_size = 6500
+        print((total_images//big_batch_size))
         for big_batch_start in range(0, (total_images//big_batch_size)):
-            testing_images, testing_labels = get_full_set(182000 + (big_batch_start)*maths_per_big_batch, 182000 + (big_batch_start+1)*maths_per_big_batch, 600000 + big_batch_start*EMNIST_per_big_batch, 600000 + (big_batch_start + 1)*EMNIST_per_big_batch, "training")
-
-            print("loading finished")
-            print(len(testing_images))
+            testing_images, testing_labels = get_full_set(3000+big_batch_start*maths_per_big_batch, 3000+(big_batch_start+1)*maths_per_big_batch , 10000+big_batch_start*EMNIST_per_big_batch, 10000+(big_batch_start+1)*EMNIST_per_big_batch, "testing")
+            print(f"loading big batch {big_batch_start} finished")
+            # print(len(testing_images))
             for batch in range(0, len(testing_labels) // 130):
-                if batch % 100 == 0:
-                    print(batch)
+                # if batch % 100 == 0:
+                #     print(batch)
                 starting_index = batch * 130
                 finishing_index = (batch + 1) * 130
                 forward = testing_images[starting_index:finishing_index]
@@ -849,6 +874,50 @@ class Classification_Model_NEW:
                     possible_confusables = get_similar_letters(prediction_as_letter)
                     if label_as_letter in possible_confusables:
                         confusable_correct_counter = confusable_correct_counter+1
+            del testing_images, testing_labels
+        time_after_accuracy_check = time.time()
+        time_for_accuracy_check = time_after_accuracy_check - time_before_accuracy_check
+        print("Accuracy check", round(time_for_accuracy_check, 3))
+        return round((correct_counter / total_images * 100), 3), round((confusable_correct_counter / total_images * 100), 3)
+
+
+    def validation_accuracy_check(self):
+        time_before_accuracy_check = time.time()
+        correct_counter = 0
+        confusable_correct_counter = 0
+
+        total_images = 13000
+        maths_per_big_batch = 1500
+        EMNIST_per_big_batch = 5000
+        big_batch_size = 6500
+        print((total_images//big_batch_size))
+        for big_batch_start in range(0, (total_images//big_batch_size)):
+            testing_images, testing_labels = get_full_set(big_batch_start*maths_per_big_batch, (big_batch_start+1)*maths_per_big_batch , big_batch_start*EMNIST_per_big_batch, (big_batch_start+1)*EMNIST_per_big_batch, "testing")
+            print(f"loading big batch {big_batch_start} finished")
+            # print(len(testing_images))
+            for batch in range(0, len(testing_labels) // 130):
+                # if batch % 100 == 0:
+                #     print(batch)
+                starting_index = batch * 130
+                finishing_index = (batch + 1) * 130
+                forward = testing_images[starting_index:finishing_index]
+                labels = testing_labels[starting_index:finishing_index]
+                for layer in self.layers:
+                    forward = layer.forward_pass(forward)
+                predictions = numpy.argmax(forward, axis=1)
+                # print(predictions.shape)
+                for prediction_index in range(0, 130):
+                    prediction = predictions[prediction_index]
+                    label = labels[prediction_index]
+                    if prediction == label:
+                        correct_counter = correct_counter + 1
+
+                    prediction_as_letter = numbers_to_labels[prediction]
+                    label_as_letter = numbers_to_labels[label]
+                    possible_confusables = get_similar_letters(prediction_as_letter)
+                    if label_as_letter in possible_confusables:
+                        confusable_correct_counter = confusable_correct_counter+1
+            del testing_images, testing_labels
         time_after_accuracy_check = time.time()
         time_for_accuracy_check = time_after_accuracy_check - time_before_accuracy_check
         print("Accuracy check", round(time_for_accuracy_check, 3))
@@ -889,9 +958,15 @@ def get_progress():
             json.dump(accuracies, file)
 
 
-get_progress()
-
-# images, labels = get_full_set(0, 10, 0, 30, "training")
-#
-# for image_index in range(len(images)):
-#     view_numpy_as_jpg(filepath=None, numpy_file=images[image_index], label=numbers_to_labels[labels[image_index]])
+# get_progress()
+hyperparam_set = get_random_hyperparams()
+classifier = Classification_Model_NEW(hyperparam_set)
+classifier.train()
+classifier.load_parameters()
+print(classifier.testing_accuracy_check())
+# time_before_loading = time.time()
+# classifier.load_parameters()
+# time_after_loading = time.time()
+# loading_time = time_after_loading - time_before_loading
+# print(f"Loading time = {loading_time}")
+# print(classifier.accuracy_check())

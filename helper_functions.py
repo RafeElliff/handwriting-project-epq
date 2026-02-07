@@ -15,7 +15,7 @@ def scale_array_to_0_to_1(numpy_array, inverse):
         forward = numpy_array
     scaled = numpy.divide(forward, 255)
     scaled_reshaped = numpy.reshape(scaled, (28, 28))
-    scaled_reshaped = scaled_reshaped.astype(numpy.float32)
+    # scaled_reshaped = scaled_reshaped.astype(numpy.float32)
     return scaled_reshaped
 
 def view_numpy_as_jpg(filepath, numpy_file, label):
