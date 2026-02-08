@@ -420,7 +420,7 @@ def get_random_hyperparams():
     batch_size_test = False
     L2_LB = 0.01
     L2_UB = 0.1
-    default_L2 = 0.03
+    default_L2 = 0
     L2_range_test = False
     possible_filter_sizes = [(16, 32, 64), (32, 48, 64), (32, 64, 128)]
     default_filter_sizes = (32, 48, 64)
@@ -646,8 +646,9 @@ class Classification_Model_NEW:
         layer_2 = CONV_Layer(3, hyperparams[3][1], 1, hyperparams[3][0], 28, self)
         layer_3 = ReLU_Layer(self)  # dOutput = 28*28*64
         layer_4 = CONV_Layer(3, hyperparams[3][2], 1, hyperparams[3][1], 28, self)  # dOutput = 28*28*128
-        layer_5 = Flatten_Layer(self)  # dOutput = 100352
-        layer_6 = Linear_Layer(28 * 28 * hyperparams[3][2], 84, self)  # dOutput = 62
+        layer_5 = ReLU_Layer(self)
+        layer_6 = Flatten_Layer(self)  # dOutput = 100352
+        layer_7 = Linear_Layer(28 * 28 * hyperparams[3][2], 84, self)  # dOutput = 62
 
         layers = [
             layer_0,
@@ -657,6 +658,7 @@ class Classification_Model_NEW:
             layer_4,
             layer_5,
             layer_6,
+            layer_7
         ]
         self.layers = layers
         self.L2_lambda = hyperparams[2]
@@ -741,9 +743,12 @@ class Classification_Model_NEW:
                         # print("Layer", layer.id, time_for_layer)
                     time_after_forward_pass = time.time()
                     time_for_forward_pass = time_after_forward_pass - time_before_forward_pass
-                    time_before_L2 = time.time()
+                    time_before_svm = time.time()
                     loss, dLoss, correct = batched_SVM(forward, ground_truth)
                     L2_loss = 0
+                    time_after_svm = time.time()
+                    time_for_svm = time_after_svm - time_before_svm
+                    time_before_L2 = time.time()
                     for layer in self.layers:
                         if layer.type == "Linear Layer":
                             L2_loss = L2_loss + numpy.sum(layer.weights ** 2)
@@ -784,6 +789,7 @@ class Classification_Model_NEW:
                         print("data_loading", round(time_after_loading_data - time_before_loading_data, 3))
                         print("layer_declaration", round(time_for_layer_declaration, 3))
                         print("forward_pass", round(time_for_forward_pass, 3))
+                        print("SVM", round(time_for_svm, 3))
                         print("L2", round(time_for_L2, 3))
                         print("backprop", round(time_for_backprop, 3))
                         print("optimiser_step", round(time_for_optimiser_step, 3))
