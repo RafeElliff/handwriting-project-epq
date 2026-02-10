@@ -5,8 +5,9 @@ import numpy
 import math
 import time
 import pickle
-from helper_functions import scale_array_to_0_to_1, view_numpy_as_jpg
+from helper_functions import scale_array_to_0_to_1, view_numpy_as_jpg, get_similar_letters
 from load_images import get_EMNIST_images, get_maths_images, get_full_set
+from confirm_which_char import get_percentages_from_forward_pass, get_letter_possibilites, get_user_input
 import json
 from numpy.lib.stride_tricks import as_strided
 
@@ -185,16 +186,6 @@ numbers_to_labels = {
     83: '}'
 }
 
-def get_similar_letters(letter):
-    letters_like_l = ["1", "ascii_124", "I", "!"]
-    letters_like_O = ["O", "0"]
-    letters_like_c = [ "C", "("]
-    letters_like_x = ["times", "X"]
-    groups = [letters_like_l, letters_like_O, letters_like_c, letters_like_x]
-    for group in groups:
-        if letter in group:
-            return group
-    return [letter]
 
 
 class Linear_Layer:
@@ -664,7 +655,7 @@ class Classification_Model_NEW:
         self.L2_lambda = hyperparams[2]
         self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 1e-8)
         self.optimiser.zero_gradients(layers)
-        self.best_accuracy = 0
+        self.best_accuracy = 90.964
         self.epochs_without_improvement = 0
         self.gradients = {}
 
@@ -933,9 +924,15 @@ class Classification_Model_NEW:
         forward = image
         for layer in self.layers:
             forward = layer.forward_pass(forward)
-        prediction = numpy.argmax(forward)
-        certainty = numpy.argmax(forward)  #THIS CODE ISN'T FINISHED YET
-        return prediction, certainty
+        forward_vector = forward[0]
+        percentages = get_percentages_from_forward_pass(forward_vector)
+        print(percentages)
+        letter_possibilites = get_letter_possibilites()
+        print(letter_possibilites)
+        print("IMage shape", image.shape)
+        final_output = get_user_input(image, letter_possibilites)
+        print(final_output)
+        return final_output
 
 
 # hyperparam_list = []
@@ -967,9 +964,11 @@ def get_progress():
 # get_progress()
 hyperparam_set = get_random_hyperparams()
 classifier = Classification_Model_NEW(hyperparam_set)
-classifier.train()
+# classifier.train()
 classifier.load_parameters()
-print(classifier.testing_accuracy_check())
+image, label = get_EMNIST_images(0, 1, "testing")
+classifier.get_prediction(image)
+# print(classifier.testing_accuracy_check())
 # time_before_loading = time.time()
 # classifier.load_parameters()
 # time_after_loading = time.time()

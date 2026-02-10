@@ -29,6 +29,17 @@ def view_numpy_as_jpg(filepath, numpy_file, label):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+def get_similar_letters(letter):
+    letters_like_l = ["1", "ascii_124", "I", "!"]
+    letters_like_O = ["O", "0"]
+    letters_like_c = [ "C", "("]
+    letters_like_x = ["times", "X"]
+    groups = [letters_like_l, letters_like_O, letters_like_c, letters_like_x]
+    for group in groups:
+        if letter in group:
+            return group
+    return [letter]
+
 
 # dummy_array = numpy.random.randint(0, 256, size = (400, 400), dtype=numpy.uint8)
 # padded = resize_to_28_x_28(dummy_array)
