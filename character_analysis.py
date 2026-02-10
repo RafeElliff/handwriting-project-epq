@@ -926,12 +926,9 @@ class Classification_Model_NEW:
             forward = layer.forward_pass(forward)
         forward_vector = forward[0]
         percentages = get_percentages_from_forward_pass(forward_vector)
-        print(percentages)
-        letter_possibilites = get_letter_possibilites()
-        print(letter_possibilites)
-        print("IMage shape", image.shape)
+        letter_possibilites = get_letter_possibilites(forward_vector)
+        # letter_possibilites = [0, "g", "f"]
         final_output = get_user_input(image, letter_possibilites)
-        print(final_output)
         return final_output
 
 
@@ -966,8 +963,14 @@ hyperparam_set = get_random_hyperparams()
 classifier = Classification_Model_NEW(hyperparam_set)
 # classifier.train()
 classifier.load_parameters()
-image, label = get_EMNIST_images(0, 1, "testing")
-classifier.get_prediction(image)
+images, labels = get_EMNIST_images(0, 1000, "testing")
+index = 0
+for image in images:
+    index = index+1
+    print(index)
+    image = image.reshape(1, 28, 28, 1)
+    classifier.get_prediction(image)
+print(labels)
 # print(classifier.testing_accuracy_check())
 # time_before_loading = time.time()
 # classifier.load_parameters()

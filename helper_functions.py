@@ -30,11 +30,12 @@ def view_numpy_as_jpg(filepath, numpy_file, label):
         cv2.destroyAllWindows()
 
 def get_similar_letters(letter):
-    letters_like_l = ["1", "ascii_124", "I", "!"]
+    letters_like_l = ["1", "ascii_124", "I", "!", "L"]
     letters_like_O = ["O", "0"]
     letters_like_c = [ "C", "("]
     letters_like_x = ["times", "X"]
-    groups = [letters_like_l, letters_like_O, letters_like_c, letters_like_x]
+    letters_like_F = ["F", "f"]
+    groups = [letters_like_l, letters_like_O, letters_like_c, letters_like_x, letters_like_F]
     for group in groups:
         if letter in group:
             return group

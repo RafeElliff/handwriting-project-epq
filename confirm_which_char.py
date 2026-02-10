@@ -105,7 +105,7 @@ def get_percentages_from_forward_pass(forward_pass_scores):
     return percentage_chances
 
 
-def get_letter_possibilites(forward_pass_scores, threshold_a=0.9, threshold_b=0.05, check_for_confusables=True):
+def get_letter_possibilites(forward_pass_scores, threshold_a=0.75, threshold_b=0.1, check_for_confusables=True):
     percentage_chances = get_percentages_from_forward_pass(forward_pass_scores)
     if numpy.max(percentage_chances) > threshold_a:
         return [numpy.argmax(percentage_chances)]
@@ -113,6 +113,7 @@ def get_letter_possibilites(forward_pass_scores, threshold_a=0.9, threshold_b=0.
         potential_letters = []
         for index in range(len(percentage_chances)):
             class_percentage = percentage_chances[index]
+            # print(class_percentage)
             if class_percentage > threshold_b:
                 potential_letters.append(numbers_to_labels[index]) #Possible that using a system based on n highest scorers works better - need to test
         if check_for_confusables is True:
@@ -123,6 +124,8 @@ def get_letter_possibilites(forward_pass_scores, threshold_a=0.9, threshold_b=0.
             print(potential_letters_set, confusable_letters_set)
             if potential_letters_set.issubset(confusable_letters_set):
                 return [numpy.argmax(percentage_chances)]
+            else:
+                return potential_letters
         else:
             return potential_letters
 
@@ -133,7 +136,7 @@ def get_user_input(numpy_array, potential_letters):
     if len(potential_letters) == 1:
         return potential_letters[0]
     else:
-        print(image_scaled_up.shape)
+        print(potential_letters)
         cv2.imshow(str(potential_letters), image_for_display)
         while True:
             key_pressed_id = cv2.waitKey(0)
