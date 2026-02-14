@@ -28,7 +28,7 @@ def binarise_scan(source_jpg, file_name):
     grayscale_image = cv2.imread(source_jpg, 2)  #reads the image as a grayscale
     blurred = cv2.GaussianBlur(grayscale_image, (101, 101), 0)
     normalised = cv2.divide(grayscale_image, blurred, scale=255)
-    _, black_and_white_image = cv2.threshold(normalised, 239, 255, cv2.THRESH_BINARY)  # stores the numpy datain black_and_white image
+    _, black_and_white_image = cv2.threshold(normalised, 239, 255, cv2.THRESH_BINARY)
     black_and_white_image = cv2.bitwise_not(
         black_and_white_image)
     #the segmentation function used looks for white characters on a black background so it must be inverted

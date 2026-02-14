@@ -121,7 +121,7 @@ def get_letter_possibilites(forward_pass_scores, threshold_a=0.75, threshold_b=0
             potential_letters_set = set(potential_letters)
             confusable_letters_for_letter = get_similar_letters(first_letter)
             confusable_letters_set = set(confusable_letters_for_letter)
-            print(potential_letters_set, confusable_letters_set)
+            # print(potential_letters_set, confusable_letters_set)
             if potential_letters_set.issubset(confusable_letters_set):
                 return [numpy.argmax(percentage_chances)]
             else:
@@ -129,6 +129,93 @@ def get_letter_possibilites(forward_pass_scores, threshold_a=0.75, threshold_b=0
         else:
             return potential_letters
 
+
+labels_to_numbers = {
+    '0': 0,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    'A': 10,
+    'B': 11,
+    'C': 12,
+    'D': 13,
+    'E': 14,
+    'F': 15,
+    'G': 16,
+    'H': 17,
+    'I': 18,
+    'J': 19,
+    'K': 20,
+    'L': 21,
+    'M': 22,
+    'N': 23,
+    'O': 24,
+    'P': 25,
+    'Q': 26,
+    'R': 27,
+    'S': 28,
+    'T': 29,
+    'U': 30,
+    'V': 31,
+    'W': 32,
+    'X': 33,
+    'Y': 34,
+    'Z': 35,
+    'a': 36,
+    'b': 37,
+    'd': 38,
+    'e': 39,
+    'f': 40,
+    'g': 41,
+    'h': 42,
+    'n': 43,
+    'q': 44,
+    'r': 45,
+    't': 46,
+    '!': 47,
+    '(': 48,
+    ')': 49,
+    '+': 50,
+    ',': 51,
+    '-': 52,
+    '=': 53,
+    '[': 54,
+    ']': 55,
+    'alpha': 56,
+    'ascii_124': 57,
+    'beta': 58,
+    'Delta': 59,
+    'div': 60,
+    'exists': 61,
+    'forall': 62,
+    'forward_slash': 63,
+    'gamma': 64,
+    'gt': 65,
+    'in': 66,
+    'infty': 67,
+    'int': 68,
+    'lambda': 69,
+    'lt': 70,
+    'mu': 71,
+    'neq': 72,
+    'phi': 73,
+    'pi': 74,
+    'prime': 75,
+    'rightarrow': 76,
+    'sigma': 77,
+    'sqrt': 78,
+    'sum': 79,
+    'theta': 80,
+    'times': 81,
+    '{': 82,
+    '}': 83
+}
 
 def get_user_input(numpy_array, potential_letters):
     image_scaled_up = (numpy_array * 255).astype(numpy.uint8)
@@ -144,4 +231,4 @@ def get_user_input(numpy_array, potential_letters):
             id_for_indexing = key_pressed_char-1
             if id_for_indexing < len(potential_letters):
                 cv2.destroyAllWindows()
-                return potential_letters[id_for_indexing]
+                return labels_to_numbers[potential_letters[id_for_indexing]]

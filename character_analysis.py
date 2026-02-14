@@ -420,7 +420,7 @@ def get_random_hyperparams():
     learning_rate_decay_options = [(0, 0, 0), (1, 0.95, 5), (1, 0.9, 5), (1, 0.8, 5), (2, 0.96, 0), (2, 0.93, 0),
                                    (2, 0.9, 0)]
     LR_decay_test = False
-    LR_decay_default = learning_rate_decay_options[5]
+    LR_decay_default = learning_rate_decay_options[0]
     random_LR = random.uniform(LR_LB, LR_UB)
     random_L2 = random.uniform(L2_LB, L2_UB)
     random_batch_size = random.choice(batch_size_options)
@@ -655,7 +655,7 @@ class Classification_Model_NEW:
         self.L2_lambda = hyperparams[2]
         self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 1e-8)
         self.optimiser.zero_gradients(layers)
-        self.best_accuracy = 90.964
+        self.best_accuracy = 86.5
         self.epochs_without_improvement = 0
         self.gradients = {}
 
@@ -921,6 +921,7 @@ class Classification_Model_NEW:
         return round((correct_counter / total_images * 100), 3), round((confusable_correct_counter / total_images * 100), 3)
 
     def get_prediction(self, image):
+        image = image.reshape(1, 28, 28, 1)
         forward = image
         for layer in self.layers:
             forward = layer.forward_pass(forward)
@@ -957,20 +958,35 @@ def get_progress():
         with open(os.path.join(base_training_data, "accuracies.json"), "w") as file:
             json.dump(accuracies, file)
 
+def full_classification_pipeline(list_of_npy_arrays):
+    hyperparam_set = get_random_hyperparams()
+    classifier = Classification_Model_NEW(hyperparam_set)
+    classifier.load_parameters()
+    predictions = []
+    images, labels = get_EMNIST_images(0, 100, "testing")
+    for index in range(0, len(list_of_npy_arrays)):
+        array = list_of_npy_arrays[index]
+        # print(array)
+        # print(images[index])
+        # view_numpy_as_jpg(None, array, "Test")
+        # view_numpy_as_jpg(None, images[index], "Test")
+        prediction = classifier.get_prediction(array)
+        predictions.append(prediction)
+    return predictions
 
-# get_progress()
-hyperparam_set = get_random_hyperparams()
-classifier = Classification_Model_NEW(hyperparam_set)
+# # # get_progress()
+# hyperparam_set = get_random_hyperparams()
+# classifier = Classification_Model_NEW(hyperparam_set)
 # classifier.train()
-classifier.load_parameters()
-images, labels = get_EMNIST_images(0, 1000, "testing")
-index = 0
-for image in images:
-    index = index+1
-    print(index)
-    image = image.reshape(1, 28, 28, 1)
-    classifier.get_prediction(image)
-print(labels)
+# # classifier.validation_accuracy_check()
+# classifier.load_parameters()
+# index = 0
+# for image in images:
+#     index = index+1
+#     print(index)
+#     image = image.reshape(1, 28, 28, 1)
+#     classifier.get_prediction(image)
+# print(labels)
 # print(classifier.testing_accuracy_check())
 # time_before_loading = time.time()
 # classifier.load_parameters()

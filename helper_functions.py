@@ -3,10 +3,30 @@ import numpy
 
 
 def resize_to_28_x_28(numpy_array):
-    resized = cv2.resize(numpy_array, (24, 24), interpolation= cv2.INTER_LINEAR)
-    padded = numpy.pad(resized, ((2, 2), (2, 2)), mode='constant', constant_values=255)
+    height, width = numpy_array.shape
+    biggest_size = max(height, width)
+    scale_factor = 24/biggest_size
+    new_component_height = int(height * scale_factor)
+    new_component_width = int(width *scale_factor)
+    resized = cv2.resize(numpy_array, (new_component_width, new_component_height), interpolation= cv2.INTER_LINEAR)
+    x_padding = (28-new_component_width)//2
+    y_padding = (28-new_component_height)//2
+    x_remainder_padding = (28-new_component_width) % 2
+    y_remaninder_padding = (28-new_component_height) % 2
+    padded = numpy.pad(resized, ((y_padding, y_padding+y_remaninder_padding), (x_padding, x_padding+x_remainder_padding)), mode='constant', constant_values=0)
     return padded
 
+def binarise_image(image, threshold):
+    height, width = image.shape
+    if width > 100 or height > 100:
+        blurred = cv2.GaussianBlur(image, (11, 11), 0)
+        normalised = cv2.divide(image, blurred, scale=255)
+        _, black_and_white_image = cv2.threshold(normalised, threshold, 255, cv2.THRESH_BINARY)
+    else:
+        blurred = cv2.GaussianBlur(image, (3, 3), 0)
+        normalised = cv2.divide(image, blurred, scale=255)
+        _, black_and_white_image = cv2.threshold(normalised, threshold, 255, cv2.THRESH_BINARY)
+    return black_and_white_image
 
 def scale_array_to_0_to_1(numpy_array, inverse):
     if inverse:
@@ -19,13 +39,14 @@ def scale_array_to_0_to_1(numpy_array, inverse):
     return scaled_reshaped
 
 def view_numpy_as_jpg(filepath, numpy_file, label):
+    label_str = str(label)
     if filepath:
         image = numpy.load(filepath)
-        cv2.imshow(label, image)
+        cv2.imshow(label_str, image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     if numpy_file is not None:
-        cv2.imshow(label, numpy_file)
+        cv2.imshow(label_str, numpy_file)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -41,6 +62,18 @@ def get_similar_letters(letter):
             return group
     return [letter]
 
+# def skeletonise_numpy(numpy):
+
+
+def get_npy_images(components, npy_filename, numpy_array):
+    resized_list = []
+    resized_ids_list = []
+    for component in components:
+        component_numpy_array = numpy_array[component.y: component.y + component.height, component.x: component.x + component.width]
+        resized = resize_to_28_x_28(component_numpy_array)
+        resized_list.append(resized)
+        resized_ids_list.append(component.id)
+    return components, resized_list, npy_filename
 
 # dummy_array = numpy.random.randint(0, 256, size = (400, 400), dtype=numpy.uint8)
 # padded = resize_to_28_x_28(dummy_array)

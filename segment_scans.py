@@ -64,6 +64,7 @@ def join_2_part_letters(components, CCA_info, numpy_file):  # this function join
                 potential_tittles.remove(tittle)
 
     for stub, tittle in pairings.items():
+        # print(len(pairings))
         leftmost_point = min(stub.x, tittle.x)
         rightmost_point = max(stub.x + tittle.width, tittle.x + tittle.width)
         highest_point = min(stub.y, tittle.y)
@@ -201,24 +202,6 @@ def look_through_npys():
         cv2.destroyAllWindows()
 
 
-def show_components(image, components, scale=5):
-    for i, c in enumerate(components):
-        letter = image[c.y:c.y + c.height, c.x:c.x + c.width]
-
-        # Enlarge for display
-        letter_big = cv2.resize(
-            letter,
-            None,
-            fx=scale,
-            fy=scale,
-            interpolation=cv2.INTER_NEAREST
-        )
-
-        cv2.imshow(f"Component {i}", letter_big)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-
 def mark_split_line_components(components, CCA_info, filename):
     split_letter_npy = numpy.load(os.path.join(list_of_split_px, filename[:-4] + "split_letter_px.npy"))
     labels = CCA_info[1]
@@ -258,39 +241,42 @@ def remove_null_components(components, numpy_array):
 
 
     return true_components
+
+
 def full_segmentation_pipeline(npy_filename):
     numpy_array = numpy.load(os.path.join(images_prepared_npy, npy_filename))
+    # print("1")
     numpy_array = morphological_opening(numpy_array)
     numpy_array = close_gaps(numpy_array)
+    # print("2")
     components, CCA_info = get_all_components(numpy_array)
+    # print("3")
     split_letter_ids = mark_split_line_components(components, CCA_info, npy_filename)
     split_components = set()
+    # print("4")
     for component in components:
         if component.id in split_letter_ids:
             component.split_letter = True
             split_components.add(component)
+    # print("5")
     numpy_array = connect_split_letters(numpy_array, split_components)
+    # print("6")
     components, CCA_info = get_all_components(numpy_array)
+    # print("7")
     components, CCA_info = join_2_part_letters(components, CCA_info, numpy_array)
+    # print("8")
     numpy_array, components = clean_up_scan(components, CCA_info, numpy_array)
+    # print("9")
     components = remove_null_components(components, numpy_array)
     return numpy_array, components, npy_filename
 
-def get_npy_images(components, npy_filename, numpy_array):
-    resized_list = []
-    resized_ids_list = []
-    for component in components:
-        component_numpy_array = numpy_array[component.y: component.y + component.height, component.x: component.x + component.width]
-        resized = resize_to_28_x_28(component_numpy_array)
-        resized_list.append(resized)
-        resized_ids_list.append(component.id)
-    return components, resized_list, npy_filename
 
 
 
 
 
-numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
+
+# numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
 # dest_file = os.path.join(images_processed_jpg, "gold standard scan.jpg")
 # cv2.imwrite(dest_file, numpy_array)
 # numpy_array, components = full_segmentation_pipeline("standardise_1.npy")
