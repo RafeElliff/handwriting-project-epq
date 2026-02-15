@@ -5,8 +5,9 @@ import cv2
 from segment_scans import full_segmentation_pipeline
 from character_analysis import full_classification_pipeline
 import numpy
+from prepare_scans import get_skeletons
 base_pdf_folder= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\final_pdfs"
-images_prepared_base_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_jpg"
+images_prepared_base_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_lines_removed"
 
 labels_to_numbers = {
     '0': 0,
@@ -182,13 +183,12 @@ numbers_to_labels = {
 }
 
 #
-original_page_width, original_page_height = (2000, 3000)
 # c = canvas.Canvas(base_pdf_folder+"\\final_pdf.pdf", pagesize=(original_page_width,original_page_height))
 # c.setFont("Times-Roman", 20)
 # c.drawString(0, original_page_height-20, "Hello World")
-file_name = "gold standard scan"
+file_name = "maths"
 def draw_letters_to_pdf(letter_information_lists, file_name):
-    images_prepared_filepath = os.path.join(images_prepared_base_folder, file_name+".jpg")
+    images_prepared_filepath = os.path.join(images_prepared_base_folder, file_name+".png")
     original_page_height, original_page_width = cv2.imread(images_prepared_filepath, 2).shape
     print(original_page_height, original_page_width)
     c = canvas.Canvas(os.path.join(base_pdf_folder, file_name+".pdf"), pagesize=(original_page_width, original_page_height))
@@ -205,16 +205,6 @@ def draw_letters_to_pdf(letter_information_lists, file_name):
 
 
 
-letter_information_lists = [
-    ('A', (70, 1000), 40),
-    ('B', (140, 1000), 40),
-    ('x', (210, 1040), 24),
-    ('D', (280, 1000), 40),
-    ('E', (350, 1000), 40),
-    ('y', (420, 960), 20),
-    ('F', (490, 1000), 40),
-    ('G', (560, 1000), 40),
-]
 
 # letter_information_tuples = []
 # for i in range(1, 61):
@@ -223,15 +213,12 @@ letter_information_lists = [
 #     letter_information_tuples.append(letter)
 
 def get_letter_information_lists(filename):
-    numpy_array, components, npy_filename = full_segmentation_pipeline(filename+".npy")
-    components, list_of_resized, npy_filename = get_npy_images(components, npy_filename, numpy_array)
-    numpy_list_of_resized = numpy.array(list_of_resized)
-    normalised = numpy_list_of_resized/255
-    predictions = full_classification_pipeline(normalised)
+    components, normalised_skeletons = get_skeletons(filename)
+    numpy_skeletons = numpy.array(normalised_skeletons)
+    predictions = full_classification_pipeline(numpy_skeletons)
     letter_information_lists = []
     for index in range(0, len(components)):
         component = components[index]
-        resized = list_of_resized[index]
         prediction = predictions[index]
         component_x_coordinate = component.x
         component_y_coordinate = component.y+component.height

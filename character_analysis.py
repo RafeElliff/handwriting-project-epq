@@ -5,7 +5,7 @@ import numpy
 import math
 import time
 import pickle
-from helper_functions import scale_array_to_0_to_1, view_numpy_as_jpg, get_similar_letters
+from helper_functions import scale_array_to_0_to_1, view_numpy_as_png, get_similar_letters
 from load_images import get_EMNIST_images, get_maths_images, get_full_set
 from confirm_which_char import get_percentages_from_forward_pass, get_letter_possibilites, get_user_input
 import json
@@ -898,6 +898,8 @@ class Classification_Model_NEW:
                 starting_index = batch * 130
                 finishing_index = (batch + 1) * 130
                 forward = testing_images[starting_index:finishing_index]
+                for image in forward:
+                    view_numpy_as_jpg(None, image[:, :, 0], "test")
                 labels = testing_labels[starting_index:finishing_index]
                 for layer in self.layers:
                     forward = layer.forward_pass(forward)

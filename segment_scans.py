@@ -1,14 +1,13 @@
 import os
 import cv2
 import numpy
-from helper_functions import resize_to_28_x_28
+from helper_functions import resize_to_28_x_28, view_numpy_as_png
 
-images_prepared_npy  = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_npy"
-images_prepared_jpg  = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_jpg"
-list_of_split_px     = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\list_of_split_px"
-images_processed_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_processed_npy"
-images_processed_jpg = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_processed_jpg"
-
+images_heavily_binarised= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_heavily_binarised"
+images_weakly_binarised= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_weakly_binarised"
+list_of_split_px_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\list_of_split_px"
+images_lines_removed = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_lines_removed"
+images_morphs_applied = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_morphs_applied"
 class Component:
     def __init__(self, x, y, width, height, area, centroid, id, split_letter):
         self.x = x
@@ -20,6 +19,29 @@ class Component:
         self.id = id
         self.split_letter = split_letter
 
+def is_valid_component(component):
+    size = False
+    area = False
+    aspect_ratio = False
+    not_background = False
+    if component.area < 50:
+        return False
+    print(component.x, component.y, component.id)
+    if 5 < component.width <200 and 5 < component.height < 200:
+        size = True
+    else:
+        print(f"Component {component.id} failed height/width check, dimensions = {component.height}, {component.width}")
+    if 100 < component.area < 4000:
+        area = True
+    else:
+        print(f"Component {component.id} failed area check, area = {component.area}")
+    if 0.1 < component.width / component.height < 10:
+        aspect_ratio = True
+    else:
+        print(f"Component {component.id} failed AR check, AR = {component.width/component.height}")
+    if component.id != 0:
+        not_background = True
+    return (size and area and aspect_ratio and not_background)
 
 def get_all_components(npy_array):
     num_of_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(npy_array,
@@ -40,51 +62,50 @@ def get_all_components(npy_array):
     return components_list, CCA_info
 
 
+
 def join_2_part_letters(components, CCA_info, numpy_file):  # this function joins the tittles in i and j to their stubs
     labels = CCA_info[1]
-    height, width = numpy_file.shape
-    potential_stubs = []
-    potential_tittles = []
+    broken_components = []
     for component in components:
-        if component.height / component.width > 1.6 and component.height < 65 or (component.height < 40 and component.width < 40):  # if more than 1.6x as tall as wide, it's probably a stub
-            potential_stubs.append(component)
-        if 20 < component.area < 200:
-            potential_tittles.append(component)  # if less than 60px in total, it's probably a tittle
+        if 50 < component.area < 600:
+            broken_components.append(component)
 
-    potential_stubs = sorted(potential_stubs, key=lambda component: component.centroid[0])
-    potential_tittles = sorted(potential_tittles,
-                               key=lambda component: component.centroid[0])  #Sorts them by their y centroid
 
     pairings = {}
-    for stub in potential_stubs:
-        for tittle in potential_tittles:
-            if (
-                    stub.x - 50 < tittle.x < stub.x + 50) and stub.y - 60 < tittle.y < stub.y:  # compares all tittles to the parameters they must meet to be joined
-                pairings[stub] = tittle
-                potential_tittles.remove(tittle)
+    used_components = []
+    for comp_a in broken_components:
+        if comp_a not in used_components:
+            for comp_b in broken_components:
+                if comp_b not in used_components:
+                    if (
+                            comp_a.x - 20 < comp_b.x < comp_a.x + 20) and comp_a.y - 40 < comp_b.y < comp_a.y + 40 and comp_a != comp_b:  # compares all tittles to the parameters they must meet to be joined
+                        pairings[comp_a] = comp_b
+                        used_components.append(comp_a)
+                        used_components.append(comp_b)
 
-    for stub, tittle in pairings.items():
+    for comp_a, comp_b in pairings.items():
         # print(len(pairings))
-        leftmost_point = min(stub.x, tittle.x)
-        rightmost_point = max(stub.x + tittle.width, tittle.x + tittle.width)
-        highest_point = min(stub.y, tittle.y)
-        lowest_point = max(stub.y + stub.height, tittle.y + tittle.height)
+        leftmost_point = min(comp_a.x, comp_b.x)
+        rightmost_point = max(comp_a.x + comp_b.width, comp_b.x + comp_b.width)
+        highest_point = min(comp_a.y, comp_b.y)
+        lowest_point = max(comp_a.y + comp_a.height, comp_b.y + comp_b.height)
         new_width = rightmost_point - leftmost_point
         new_height = lowest_point - highest_point  # working out the dimensions of the new component
-        stub.x = leftmost_point
-        stub.y = highest_point
-        stub.width = new_width
-        stub.height = new_height
-        old_id = tittle.id
-        new_id = stub.id
-        for y in range(0, height):
-            for x in range (0, width):
+        comp_a.x = leftmost_point
+        comp_a.y = highest_point
+        comp_a.width = new_width
+        comp_a.height = new_height
+        old_id = comp_b.id
+        new_id = comp_a.id
+        for y in range(comp_b.y, comp_b.y+comp_b.height):
+            for x in range (comp_b.x, comp_b.x + comp_b.width):
                 if labels[y][x] == old_id:
                     labels[y][x] = new_id
-        components.remove(tittle)
+        components.remove(comp_b)
         # assigns the dimensions to the stub, removes the tittle, effectively combining them into one component.
     CCA_info = (CCA_info[0], labels, CCA_info[2], CCA_info[3])
     return components, CCA_info
+
 
 def swap_x_y(coordinate):
     y = coordinate[0]
@@ -92,7 +113,7 @@ def swap_x_y(coordinate):
     coordinate = (x, y)
     return coordinate
 
-def connect_split_letters(numpy_file, split_components):
+def connect_split_letters(numpy_file, second_image_to_draw_on, split_components):
     height, width = numpy_file.shape
     split_components = sorted(split_components, key=lambda component: component.y)
     potential_connections = set()
@@ -144,7 +165,8 @@ def connect_split_letters(numpy_file, split_components):
         if right_bottom and right_top and left_bottom and left_top:
             cv2.line(numpy_file, swap_x_y(right_bottom), swap_x_y(right_top), (255, 255, 255), 1)
             cv2.line(numpy_file, swap_x_y(left_bottom), swap_x_y(left_top), (255, 255, 255), 1)
-
+            cv2.line(second_image_to_draw_on, swap_x_y(right_bottom), swap_x_y(right_top), (255, 255, 255), 1)
+            cv2.line(second_image_to_draw_on, swap_x_y(left_bottom), swap_x_y(left_top), (255, 255, 255), 1)
             leftmost = min(left_bottom[1], left_top[1])
             rightmost = max(right_bottom[1], right_top[1])
             width_gap = rightmost - leftmost + 1
@@ -153,24 +175,11 @@ def connect_split_letters(numpy_file, split_components):
                 for x in range(leftmost + 1, min(rightmost + 1, width-1)):
                     if numpy_file[y - 1][x] == 255 and numpy_file[y - 1][min(x + 1, width-1)] == 255 and numpy_file[y][x - 1] == 255:
                         numpy_file[y][x] = 255
+                        second_image_to_draw_on[y][x] = 255
 
-    return numpy_file
+    return numpy_file, second_image_to_draw_on
 
 
-def is_valid_component(component):
-    size = False
-    area = False
-    aspect_ratio = False
-    not_background = False
-    if 5 < component.width < 75 and 5 < component.height < 90:
-        size = True
-    if 50 < component.area < 1500:
-        area = True
-    if 0.2 < component.width / component.height < 5:
-        aspect_ratio = True
-    if component.id != 0:
-        not_background = True
-    return (size and area and aspect_ratio and not_background)
 
 
 def close_gaps(numpy_file):
@@ -191,19 +200,19 @@ def find_component(components, id):
             return component
 
 
-def look_through_npys():
-    # loops through all npy files in the folder
-    for filename in os.listdir(images_prepared_npy):
-        file_path = os.path.join(images_prepared_npy, filename)
-        # loads the file
-        image = numpy.load(file_path)
-        cv2.imshow(filename, image)
-        cv2.waitKey(0)  #waits for a key press before moving
-        cv2.destroyAllWindows()
+# def look_through_npys():
+#     # loops through all npy files in the folder
+#     for filename in os.listdir(images_prepared_npy):
+#         file_path = os.path.join(images_prepared_npy, filename)
+#         # loads the file
+#         image = numpy.load(file_path)
+#         cv2.imshow(filename, image)
+#         cv2.waitKey(0)  #waits for a key press before moving
+#         cv2.destroyAllWindows()
 
 
 def mark_split_line_components(components, CCA_info, filename):
-    split_letter_npy = numpy.load(os.path.join(list_of_split_px, filename[:-4] + "split_letter_px.npy"))
+    split_letter_npy = numpy.load(os.path.join(list_of_split_px_folder, filename[:-4] + "split_letter_px.npy"))
     labels = CCA_info[1]
     split_letter_ids = set()
     for pixel in split_letter_npy:
@@ -216,7 +225,9 @@ def clean_up_scan(components, CCA_info, numpy_file):
     labels = CCA_info[1]
     height, width = numpy_file.shape
     valid_components = set()
+    view_numpy_as_png(None, numpy_file, "test")
     for component in components:
+        # print(component.x, component.y, is_valid_component(component), component.width, component.height, component.area)
         if is_valid_component(component):
             valid_components.add(component.id)
 
@@ -243,32 +254,28 @@ def remove_null_components(components, numpy_array):
     return true_components
 
 
-def full_segmentation_pipeline(npy_filename):
-    numpy_array = numpy.load(os.path.join(images_prepared_npy, npy_filename))
-    # print("1")
-    numpy_array = morphological_opening(numpy_array)
-    numpy_array = close_gaps(numpy_array)
-    # print("2")
-    components, CCA_info = get_all_components(numpy_array)
-    # print("3")
-    split_letter_ids = mark_split_line_components(components, CCA_info, npy_filename)
+def full_segmentation_pipeline(original_image, modified_image, filename):
+    modified_image = close_gaps(modified_image)
+    # view_numpy_as_png(None, modified_image, "test1")
+    components, CCA_info = get_all_components(modified_image)
+    split_letter_ids = mark_split_line_components(components, CCA_info, filename+".npy")
     split_components = set()
-    # print("4")
     for component in components:
         if component.id in split_letter_ids:
             component.split_letter = True
             split_components.add(component)
-    # print("5")
-    numpy_array = connect_split_letters(numpy_array, split_components)
-    # print("6")
-    components, CCA_info = get_all_components(numpy_array)
-    # print("7")
-    components, CCA_info = join_2_part_letters(components, CCA_info, numpy_array)
-    # print("8")
-    numpy_array, components = clean_up_scan(components, CCA_info, numpy_array)
-    # print("9")
-    components = remove_null_components(components, numpy_array)
-    return numpy_array, components, npy_filename
+
+    modified_image, original_image = connect_split_letters(modified_image, original_image, split_components)
+    # view_numpy_as_png(None, original_image, "test")
+    # kernel = numpy.ones((5, 5), numpy.uint8)
+    # dilated = cv2.dilate(modified_image, kernel, iterations=1)
+    components, CCA_info = get_all_components(modified_image)
+    components, CCA_info = join_2_part_letters(components, CCA_info, modified_image)
+    # components, CCA_info = join_2_part_letters(components, CCA_info, modified_image)
+    modified_image, components = clean_up_scan(components, CCA_info, modified_image)
+    cv2.imwrite(os.path.join(images_morphs_applied, filename + ".png"), modified_image)
+    components = remove_null_components(components, modified_image)
+    return modified_image, original_image, components, filename
 
 
 
@@ -276,13 +283,6 @@ def full_segmentation_pipeline(npy_filename):
 
 
 
-# numpy_array, components, npy_filename = full_segmentation_pipeline("gold standard scan.npy")
-# dest_file = os.path.join(images_processed_jpg, "gold standard scan.jpg")
-# cv2.imwrite(dest_file, numpy_array)
-# numpy_array, components = full_segmentation_pipeline("standardise_1.npy")
-# dest_file = os.path.join(images_processed_jpg, "standardise_1.jpg")
-# cv2.imwrite(dest_file, numpy_array)
-# numpy_array, components = full_segmentation_pipeline("standardise_3.npy")
-# dest_file = os.path.join(images_processed_jpg, "standardise_3.jpg")
+
 # cv2.imwrite(dest_file, numpy_array)
 # show_components(numpy_array, components)
