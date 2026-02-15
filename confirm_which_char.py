@@ -3,6 +3,7 @@ import numpy
 import cv2
 from helper_functions import get_similar_letters, view_numpy_as_png
 from load_images import get_EMNIST_images
+
 numbers_to_labels = {
     0: '0',
     1: '1',
@@ -89,47 +90,6 @@ numbers_to_labels = {
     82: '{',
     83: '}'
 }
-
-def get_percentages_from_forward_pass(forward_pass_scores):
-    max_score = numpy.max(forward_pass_scores)
-    shifted = forward_pass_scores-max_score
-    exp_scores = []
-    for class_score in shifted:
-        exp_score = math.e**class_score
-        exp_scores.append(exp_score)
-    sum_of_exps = sum(exp_scores)
-    percentage_chances = []
-    for exp in exp_scores:
-        percentage_chance = exp/sum_of_exps
-        percentage_chances.append(percentage_chance)
-    return percentage_chances
-
-
-def get_letter_possibilites(forward_pass_scores, threshold_a=0.75, threshold_b=0.1, check_for_confusables=True):
-    percentage_chances = get_percentages_from_forward_pass(forward_pass_scores)
-    if numpy.max(percentage_chances) > threshold_a:
-        return [numpy.argmax(percentage_chances)]
-    else:
-        potential_letters = []
-        for index in range(len(percentage_chances)):
-            class_percentage = percentage_chances[index]
-            # print(class_percentage)
-            if class_percentage > threshold_b:
-                potential_letters.append(numbers_to_labels[index]) #Possible that using a system based on n highest scorers works better - need to test
-        if check_for_confusables is True:
-            first_letter = potential_letters[0]
-            potential_letters_set = set(potential_letters)
-            confusable_letters_for_letter = get_similar_letters(first_letter)
-            confusable_letters_set = set(confusable_letters_for_letter)
-            # print(potential_letters_set, confusable_letters_set)
-            if potential_letters_set.issubset(confusable_letters_set):
-                return [numpy.argmax(percentage_chances)]
-            else:
-                return potential_letters
-        else:
-            return potential_letters
-
-
 labels_to_numbers = {
     '0': 0,
     '1': 1,
@@ -217,18 +177,78 @@ labels_to_numbers = {
     '}': 83
 }
 
-def get_user_input(numpy_array, potential_letters):
+
+def get_percentages_from_forward_pass(forward_pass_scores):
+    max_score = numpy.max(forward_pass_scores)
+    shifted = forward_pass_scores-max_score
+    exp_scores = []
+    for class_score in shifted:
+        exp_score = math.e**class_score
+        exp_scores.append(exp_score)
+    sum_of_exps = sum(exp_scores)
+    percentage_chances = []
+    for exp in exp_scores:
+        percentage_chance = exp/sum_of_exps
+        percentage_chances.append(percentage_chance)
+    return percentage_chances
+
+
+def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a=0.75, threshold_b=0.01, check_for_confusables=True):
+    percentage_chances = get_percentages_from_forward_pass(forward_pass_scores)
+    if numpy.max(percentage_chances) > threshold_a:
+        return [numpy.argmax(percentage_chances)], percentage_chances
+    else:
+        potential_letters = []
+        for index in range(len(percentage_chances)):
+            class_percentage = percentage_chances[index]
+            # print(class_percentage)
+            if class_percentage > threshold_b:
+                potential_letters.append(numbers_to_labels[index]) #Possible that using a system based on n highest scorers works better - need to test
+        if check_for_confusables is True:
+            first_letter = potential_letters[0]
+            potential_letters_set = set(potential_letters)
+            confusable_letters_for_letter = get_similar_letters(first_letter)
+            confusable_letters_set = set(confusable_letters_for_letter)
+            # print(potential_letters_set, confusable_letters_set)
+            if potential_letters_set.issubset(confusable_letters_set):
+                return [numpy.argmax(percentage_chances), percentage_chances]
+            else:
+                return potential_letters, percentage_chances
+        else:
+            return potential_letters, percentage_chances
+
+
+
+
+def get_user_input(numpy_array, potential_letters, percentage_chances):
     image_scaled_up = (numpy_array * 255).astype(numpy.uint8)
     image_for_display = image_scaled_up[0, :, :, 0]
     if len(potential_letters) == 1:
         return potential_letters[0]
     else:
-        print(potential_letters)
+        sorted_letters = []
+        for letter in potential_letters:
+            letter_index = labels_to_numbers[letter]
+            percentage = percentage_chances[letter_index]
+            sorted_letters.append((percentage, letter))
+
+        sorted_letters.sort(reverse=True)
+        potential_letters = [letter for percentage, letter in sorted_letters]
+        certainties = []
+        for class_num in range(0, len(percentage_chances)):
+            certainties.append((percentage_chances[class_num], class_num, numbers_to_labels[class_num]))
+        certainties.sort(reverse=True)
+        for index in range(0, min(len(certainties), 10)):
+            percentage, class_num, label = certainties[index]
+            if percentage > 0.01:
+                print(f"{index + 1}. {label} : {round(percentage * 100, 2)}%")
+        print("\n" * 3)
+
         cv2.imshow(str(potential_letters), image_for_display)
         while True:
             key_pressed_id = cv2.waitKey(0)
             key_pressed_char = int(chr(key_pressed_id))
-            id_for_indexing = key_pressed_char-1
+            id_for_indexing = key_pressed_char - 1
             if id_for_indexing < len(potential_letters):
                 cv2.destroyAllWindows()
                 return labels_to_numbers[potential_letters[id_for_indexing]]

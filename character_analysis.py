@@ -929,9 +929,9 @@ class Classification_Model_NEW:
             forward = layer.forward_pass(forward)
         forward_vector = forward[0]
         percentages = get_percentages_from_forward_pass(forward_vector)
-        letter_possibilites = get_letter_possibilites(forward_vector)
+        letter_possibilites, percentages = get_letter_possibilites(forward_vector,percentages)
         # letter_possibilites = [0, "g", "f"]
-        final_output = get_user_input(image, letter_possibilites)
+        final_output = get_user_input(image, letter_possibilites, percentage_chances=percentages)
         return final_output
 
 

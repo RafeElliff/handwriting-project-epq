@@ -74,9 +74,3 @@ def get_npy_images(components, npy_filename, numpy_array):
         resized_list.append(resized)
         resized_ids_list.append(component.id)
     return components, resized_list, npy_filename
-
-# dummy_array = numpy.random.randint(0, 256, size = (400, 400), dtype=numpy.uint8)
-# padded = resize_to_28_x_28(dummy_array)
-# scaled = scale_array_to_0_to_1(padded)
-# view_numpy_as_jpg(filepath=None, numpy=scaled, label="Random")
-# view_numpy_as_jpg(filepath=None, numpy=dummy_array, label="dummy")
