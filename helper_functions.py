@@ -38,7 +38,7 @@ def scale_array_to_0_to_1(numpy_array, inverse):
     # scaled_reshaped = scaled_reshaped.astype(numpy.float32)
     return scaled_reshaped
 
-def view_numpy_as_jpg(filepath, numpy_file, label):
+def view_numpy_as_png(filepath, numpy_file, label):
     label_str = str(label)
     if filepath:
         image = numpy.load(filepath)

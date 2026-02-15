@@ -1,7 +1,7 @@
 import math
 import numpy
 import cv2
-from helper_functions import get_similar_letters, view_numpy_as_jpg
+from helper_functions import get_similar_letters, view_numpy_as_png
 from load_images import get_EMNIST_images
 numbers_to_labels = {
     0: '0',

@@ -4,7 +4,7 @@ import numpy
 import random
 import json
 import time
-from helper_functions import resize_to_28_x_28, scale_array_to_0_to_1, view_numpy_as_jpg
+from helper_functions import resize_to_28_x_28, scale_array_to_0_to_1, view_numpy_as_png
 maths_source_data = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq\raw_images"
 closed_binarised_resized = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq\closed_binarised_resized"
 skeletons = r"C:\Users\rafee\PycharmProjects\data-for-handwriting-epq\skeletons"
@@ -247,7 +247,7 @@ def produce_random_ordering_and_labels():
             image_as_npy = numpy.load(os.path.join(skeletons, image_old_name))
             numpy.save(destination_path, image_as_npy)
             training_labels.append(image_label_as_number)
-            # view_numpy_as_jpg(filepath=None, numpy=image_as_npy, label=image_label_as_number)
+            # view_numpy_as_png(filepath=None, numpy=image_as_npy, label=image_label_as_number)
         else:
             destination_path = os.path.join(base_maths, "testing_skeletons", f"{image_new_position}.npy")
             image_as_npy = numpy.load(os.path.join(skeletons, image_old_name))

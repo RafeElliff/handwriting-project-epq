@@ -2,57 +2,84 @@ import os
 import fitz
 import cv2
 import numpy
-import segment_scans
+from segment_scans import full_segmentation_pipeline
+from helper_functions import get_npy_images, view_numpy_as_png
 
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
 images_pulled = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_pulled"
-images_prepared_npy = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_npy"
-images_prepared_jpg = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_prepared_jpg"
+images_heavily_binarised= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_heavily_binarised"
+images_weakly_binarised= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_weakly_binarised"
 list_of_split_px_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\list_of_split_px"
-
-
+images_lines_removed = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_lines_removed"
+images_morphs_applied = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_morphs_applied"
 def copy_new_scans():
     for file_name in os.listdir(onedrive_source):  #loops through name of every file
         if file_name[-4:] == ".pdf":
             file_to_copy = os.path.join(onedrive_source, file_name)  #accesses the file with file_name
-            dest_file = os.path.join(images_pulled, file_name[:-4] + ".jpg")
-            if file_name[:-4] + ".jpg" not in os.listdir(images_pulled):  #checks that it hasn't already been copied
+            dest_file = os.path.join(images_pulled, file_name[:-4] + ".png")
+            if file_name[:-4] + ".png" not in os.listdir(images_pulled):  #checks that it hasn't already been copied
                 pdf = fitz.open(file_to_copy)
                 page = pdf[0]
                 pix = page.get_pixmap(dpi=300)
                 pix.save(dest_file)
-                pdf.close()  #this converts the file to a jpg and saves it to images_pulled
+                pdf.close()  #this converts the file to a png and saves it to images_pulled
 
 
-def binarise_scan(source_jpg, file_name):
-    grayscale_image = cv2.imread(source_jpg, 2)  #reads the image as a grayscale
-    blurred = cv2.GaussianBlur(grayscale_image, (101, 101), 0)
-    normalised = cv2.divide(grayscale_image, blurred, scale=255)
-    _, black_and_white_image = cv2.threshold(normalised, 239, 255, cv2.THRESH_BINARY)
-    black_and_white_image = cv2.bitwise_not(
-        black_and_white_image)
-    #the segmentation function used looks for white characters on a black background so it must be inverted
-    numpy_array = black_and_white_image
-    numpy_array = segment_scans.close_gaps(numpy_array)
-    # numpy_array = segment_scans.morphological_opening(numpy_array)
-    numpy.save(os.path.join(images_prepared_npy, file_name[:-4] + ".npy"), numpy_array)
-    return numpy_array, file_name
+def binarise_scan(source_png, file_name):
+    grayscale_image = cv2.imread(source_png, 2)  #reads the image as a grayscale
+    # blurred = cv2.GaussianBlur(grayscale_image, (101, 101), 0)
+    # normalised = cv2.divide(grayscale_image, blurred, scale=255)
+    # _, heavily_binarised = cv2.threshold(normalised, 254, 255, cv2.THRESH_BINARY)
+    # blurred = cv2.GaussianBlur(grayscale_image, (21, 21), 0)
+    # normalised = cv2.divide(grayscale_image, blurred, scale=255)
+    # _, weakly_binarised = cv2.threshold(normalised, 239, 255, cv2.THRESH_BINARY)
+    # heavily_binarised = cv2.adaptiveThreshold(
+    #     grayscale_image,
+    #     255,
+    #     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+    #     cv2.THRESH_BINARY,
+    #     blockSize=15,
+    #     C=3
+    #
+
+    heavily_binarised = cv2.adaptiveThreshold(
+        grayscale_image, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        blockSize=99,  # Large for heavy (must be odd)
+        C=10
+    )
+
+    weakly_binarised = cv2.adaptiveThreshold(
+        grayscale_image, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        blockSize=21,  # Smaller for light
+        C=5
+    )
+
+    heavily_binarised= cv2.bitwise_not(heavily_binarised)
+    weakly_binarised = cv2.bitwise_not(weakly_binarised)
+    cv2.imwrite(os.path.join(images_heavily_binarised, file_name), heavily_binarised)
+    cv2.imwrite(os.path.join(images_weakly_binarised, file_name), weakly_binarised)
+    return heavily_binarised, weakly_binarised, file_name
 
 
 def save_numpys():
     for file_name in os.listdir(images_pulled):
-        if file_name not in os.listdir(images_prepared_npy):
+        if file_name not in os.listdir(images_weakly_binarised):
             file_name_no_stem = file_name[:-4]
-            source_jpg = os.path.join(images_pulled, file_name)
-            binary_scan, file_name = binarise_scan(source_jpg, file_name)
-            numpy_file, file_name = remove_lines(binary_scan, file_name)
-            dest_file_npy = os.path.join(images_prepared_npy, file_name_no_stem)
-            dest_file_jpg = os.path.join(images_prepared_jpg, file_name_no_stem)
-            cv2.imwrite(dest_file_jpg + ".jpg", binary_scan)
-            numpy.save(dest_file_npy + ".npy", numpy_file)
+            source_png = os.path.join(images_pulled, file_name)
+            heavily_binarised, weakly_binarised, file_name = binarise_scan(source_png, file_name)
+            lines_removed, file_name = remove_lines(heavily_binarised, weakly_binarised, file_name)
+            dest_file_for_png = os.path.join(images_lines_removed, file_name_no_stem)
+            kernel = numpy.ones((2, 2), numpy.uint8)
+            denoised = cv2.morphologyEx(lines_removed, cv2.MORPH_OPEN, kernel, iterations=1)
+            cv2.imwrite(dest_file_for_png + ".png", denoised)
 
 
-def remove_lines(numpy_file, file_name):
+def remove_lines(heavily_binarised, weakly_binarised, file_name):
+    numpy_file = heavily_binarised
     height, width = numpy_file.shape
     line_starter_pixels = []
     all_line_px = set()
@@ -106,9 +133,9 @@ def remove_lines(numpy_file, file_name):
         all_line_px.add((height - 1, x_value))
     pixels_to_delete = all_line_px - letter_line_px
     for pixel in pixels_to_delete:
-        numpy_file[pixel] = 0
+        weakly_binarised[pixel] = 0
         # pass
-    return numpy_file, file_name
+    return weakly_binarised, file_name
 
 
 def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest pixel on a line in a column, this finds the highest and lowest pixel in the next column.
@@ -256,6 +283,22 @@ def search_for_letters(line, numpy_file):
 
     return letter_above, letter_below, split_letter_px
 
+
+
+def get_skeletons(file_name):
+    image_lines_removed = cv2.imread(os.path.join(images_lines_removed, file_name+".png"), 2)
+    image_lines_removed_for_segmentation = image_lines_removed.copy()
+    # print(image_lines_removed.shape)
+    modified_image, original_image, components, file_name = full_segmentation_pipeline(image_lines_removed, image_lines_removed_for_segmentation, file_name)
+    components, resized_list, file_name = get_npy_images(components, file_name, original_image)
+    # print(len(components))
+    skeleton_list = []
+    for image in resized_list:
+        skeleton = cv2.ximgproc.thinning(image)/255
+        skeleton_list.append(skeleton)
+
+    return components, skeleton_list
 copy_new_scans()
 save_numpys()
-# remove_lines()
+# get_skeletons("gold standard scan")
+
