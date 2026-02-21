@@ -277,7 +277,7 @@ def check_progress():
 
 
 # rename_and_move_images()
-produce_random_ordering_and_labels()
+# produce_random_ordering_and_labels()
 # for image_id in os.listdir(os.path.join(base_maths, "28_x_28_images")):
 #     view_numpy_as_jpg(filepath = os.path.join(base_maths, "28_x_28_images", image_id), numpy_file = None, label = "test")
 #     print(image_id)

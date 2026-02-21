@@ -1,7 +1,7 @@
 import math
 import numpy
 import cv2
-from helper_functions import get_similar_letters, view_numpy_as_png
+from helper_functions import get_similar_letters, view_numpy_as_png, get_percentages_from_forward_pass
 from load_images import get_EMNIST_images
 
 numbers_to_labels = {
@@ -177,20 +177,6 @@ labels_to_numbers = {
     '}': 83
 }
 
-
-def get_percentages_from_forward_pass(forward_pass_scores):
-    max_score = numpy.max(forward_pass_scores)
-    shifted = forward_pass_scores-max_score
-    exp_scores = []
-    for class_score in shifted:
-        exp_score = math.e**class_score
-        exp_scores.append(exp_score)
-    sum_of_exps = sum(exp_scores)
-    percentage_chances = []
-    for exp in exp_scores:
-        percentage_chance = exp/sum_of_exps
-        percentage_chances.append(percentage_chance)
-    return percentage_chances
 
 
 def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a=0.75, threshold_b=0.01, check_for_confusables=True):

@@ -5,7 +5,7 @@ import numpy
 import math
 import time
 import pickle
-from helper_functions import scale_array_to_0_to_1, view_numpy_as_png, get_similar_letters
+from helper_functions import scale_array_to_0_to_1, view_numpy_as_png, get_similar_letters, get_percentages_from_forward_pass
 from load_images import get_EMNIST_images, get_maths_images, get_full_set
 from confirm_which_char import get_percentages_from_forward_pass, get_letter_possibilites, get_user_input
 import json
@@ -607,6 +607,40 @@ def batched_SVM(answers_batch,
     return average_loss, all_dLoss_matrix, total_correct
 
 
+def cross_entropy_loss_single_image(answers, ground_truth):
+    percentages = get_percentages_from_forward_pass(answers)
+    ground_truth_percentage = percentages[ground_truth]
+    loss = -numpy.log(ground_truth_percentage + 10**-10)
+    dLoss = percentages.copy()
+    dLoss[ground_truth] -= 1
+
+    prediction = numpy.argmax(answers)
+    correct = False
+    if prediction == ground_truth:
+        correct = True
+
+    return loss, dLoss, correct
+
+
+def batched_cross_entropy(answers_batch,
+                ground_truths_batch):  #Answers has shape (batch_size, 62). ground_truth has shape (batch_size)
+    total_loss = 0
+    all_dLoss = []
+    total_correct = 0
+    batch_size = len(answers_batch)
+    for image in range(0, batch_size):
+        answers = answers_batch[image]
+        ground_truth = ground_truths_batch[image]
+        loss, dLoss, correct = cross_entropy_loss_single_image(answers, ground_truth)
+        total_loss = total_loss + loss
+        all_dLoss.append(dLoss)
+        if correct:
+            total_correct = total_correct + 1
+
+    average_loss = total_loss / batch_size
+    all_dLoss_matrix = numpy.stack(all_dLoss)
+    return average_loss, all_dLoss_matrix, total_correct
+
 def LR_decay(LR_decay_hyperparam, initial_LR, epoch):
     type_of_decay = LR_decay_hyperparam[0]
     rate_of_decay = LR_decay_hyperparam[1]
@@ -655,7 +689,7 @@ class Classification_Model_NEW:
         self.L2_lambda = hyperparams[2]
         self.optimiser = Adam_Optimiser(hyperparams[0], layers, 0.9, 0.999, 1e-8)
         self.optimiser.zero_gradients(layers)
-        self.best_accuracy = 86.5
+        self.best_accuracy = 0
         self.epochs_without_improvement = 0
         self.gradients = {}
 
@@ -734,11 +768,11 @@ class Classification_Model_NEW:
                         # print("Layer", layer.id, time_for_layer)
                     time_after_forward_pass = time.time()
                     time_for_forward_pass = time_after_forward_pass - time_before_forward_pass
-                    time_before_svm = time.time()
-                    loss, dLoss, correct = batched_SVM(forward, ground_truth)
+                    time_before_loss = time.time()
+                    loss, dLoss, correct = batched_cross_entropy(forward, ground_truth)
                     L2_loss = 0
-                    time_after_svm = time.time()
-                    time_for_svm = time_after_svm - time_before_svm
+                    time_after_loss = time.time()
+                    time_for_loss = time_after_loss - time_before_loss
                     time_before_L2 = time.time()
                     for layer in self.layers:
                         if layer.type == "Linear Layer":
@@ -780,7 +814,7 @@ class Classification_Model_NEW:
                         print("data_loading", round(time_after_loading_data - time_before_loading_data, 3))
                         print("layer_declaration", round(time_for_layer_declaration, 3))
                         print("forward_pass", round(time_for_forward_pass, 3))
-                        print("SVM", round(time_for_svm, 3))
+                        print("loss", round(time_for_loss, 3))
                         print("L2", round(time_for_L2, 3))
                         print("backprop", round(time_for_backprop, 3))
                         print("optimiser_step", round(time_for_optimiser_step, 3))
@@ -898,8 +932,6 @@ class Classification_Model_NEW:
                 starting_index = batch * 130
                 finishing_index = (batch + 1) * 130
                 forward = testing_images[starting_index:finishing_index]
-                for image in forward:
-                    view_numpy_as_jpg(None, image[:, :, 0], "test")
                 labels = testing_labels[starting_index:finishing_index]
                 for layer in self.layers:
                     forward = layer.forward_pass(forward)
@@ -977,22 +1009,10 @@ def full_classification_pipeline(list_of_npy_arrays):
     return predictions
 
 # # # get_progress()
-# hyperparam_set = get_random_hyperparams()
-# classifier = Classification_Model_NEW(hyperparam_set)
+hyperparam_set = get_random_hyperparams()
+classifier = Classification_Model_NEW(hyperparam_set)
 # classifier.train()
 # # classifier.validation_accuracy_check()
-# classifier.load_parameters()
-# index = 0
-# for image in images:
-#     index = index+1
-#     print(index)
-#     image = image.reshape(1, 28, 28, 1)
-#     classifier.get_prediction(image)
-# print(labels)
-# print(classifier.testing_accuracy_check())
-# time_before_loading = time.time()
-# classifier.load_parameters()
-# time_after_loading = time.time()
-# loading_time = time_after_loading - time_before_loading
-# print(f"Loading time = {loading_time}")
-# print(classifier.accuracy_check())
+classifier.load_parameters()
+print(classifier.testing_accuracy_check())
+# print(classifier.per_character_accuracy_check())

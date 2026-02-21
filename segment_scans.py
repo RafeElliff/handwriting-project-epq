@@ -67,7 +67,7 @@ def join_2_part_letters(components, CCA_info, numpy_file):  # this function join
     labels = CCA_info[1]
     broken_components = []
     for component in components:
-        if 50 < component.area < 600:
+        if 50 < component.area < 500:
             broken_components.append(component)
 
 
@@ -225,7 +225,7 @@ def clean_up_scan(components, CCA_info, numpy_file):
     labels = CCA_info[1]
     height, width = numpy_file.shape
     valid_components = set()
-    view_numpy_as_png(None, numpy_file, "test")
+    # view_numpy_as_png(None, numpy_file, "test")
     for component in components:
         # print(component.x, component.y, is_valid_component(component), component.width, component.height, component.area)
         if is_valid_component(component):

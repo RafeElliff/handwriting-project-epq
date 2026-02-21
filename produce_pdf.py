@@ -182,6 +182,104 @@ numbers_to_labels = {
     83: '}'
 }
 
+letter_type_to_letter = {
+    '0': "0",
+    '1': "1",
+    '2': "2",
+    '3': "3",
+    '4': "4",
+    '5': "5",
+    '6': "6",
+    '7': "7",
+    '8': "8",
+    '9': "9",
+    'A': "A",
+    'B': "B",
+    'C': "C",
+    'D': "D",
+    'E': "E",
+    'F': "F",
+    'G': "G",
+    'H': "H",
+    'I': "I",
+    'J': "J",
+    'K': "K",
+    'L': "L",
+    'M': "M",
+    'N': "N",
+    'O': "O",
+    'P': "P",
+    'Q': "Q",
+    'R': "R",
+    'S': "S",
+    'T': "T",
+    'U': "U",
+    'V': "V",
+    'W': "W",
+    'X': "X",
+    'Y': "Y",
+    'Z': "Z",
+    'a': "a",
+    'b': "b",
+    'd': "d",
+    'e': "e",
+    'f': "f",
+    'g': "g",
+    'h': "h",
+    'n': "n",
+    'q': "q",
+    'r': "r",
+    't': "t",
+    '!': "!",
+    '(': "(",
+    ')': ")",
+    '+': "+",
+    ',': ",",
+    '-': "—",
+    '=': "=",
+    '[': "[",
+    ']': "]",
+    'alpha': "α",
+    'ascii_124': "|",
+    'beta': "β",
+    'Delta': "Δ",
+    'div': "÷",
+    'exists': "∃",
+    'forall': "∀",
+    'forward_slash': "/",
+    'gamma': "γ",
+    'gt': ">",
+    'in': "∈",
+    'infty': "∞",
+    'int': "∫",
+    'lambda': "λ",
+    'lt': "<",
+    'mu': "μ",
+    'neq': "≠",
+    'phi': "ϕ",
+    'pi': "π",
+    'prime': "′",
+    'rightarrow': "→",
+    'sigma': "σ",
+    'sqrt': "√",
+    'sum': "Σ",
+    'theta': "θ",
+    'times': "×",
+    '{': "{",
+    '}': "}"
+}
+
+
+def get_standardised_info(letter_real_height, letter_real_width, letter_real_y):
+    line_to_snap_to = round(letter_real_y/30, 0)
+    y_to_snap_to = line_to_snap_to * 30
+    # if letter_real_height < 20 and letter_real_width < 20:
+    #     font_size = 50
+    # else:
+    #     font_size = 100
+    average_proportion = max(letter_real_height, letter_real_width)
+    font_size = int(average_proportion / 0.7)
+    return y_to_snap_to, font_size
 #
 # c = canvas.Canvas(base_pdf_folder+"\\final_pdf.pdf", pagesize=(original_page_width,original_page_height))
 # c.setFont("Times-Roman", 20)
@@ -197,14 +295,24 @@ def draw_letters_to_pdf(letter_information_lists, file_name):
         letter_bottom_left = letter[1]
         letter_real_y = original_page_height - letter_bottom_left[1]
         letter_real_height = letter[2]
-        letter_font_size = int(letter_real_height/0.7)
+        letter_real_width = letter[3]
+        y_to_snap_to, letter_font_size = get_standardised_info(letter_real_height, letter_real_width, letter_real_y)
         c.setFont("Times-Roman", letter_font_size)
-        c.drawString(letter_bottom_left[0], letter_real_y, str(letter_type))
+        if letter_type == "-":
+            letter_font_size = letter_font_size * 2
+        c.drawString(letter_bottom_left[0], y_to_snap_to, letter_type_to_letter[str(letter_type)])
     c.save()
 
 
-
-
+# c = canvas.Canvas(os.path.join(base_pdf_folder, "testing"+".pdf"), pagesize=(2000, 3000))
+# starting_x = 0
+# starting_y = 0
+# for character_type, char_as_string in letter_type_to_letter.items():
+#     starting_y = starting_y + 30
+#     starting_x = starting_x + 20
+#     c.setFont("Times-Roman", 50)
+#     c.drawString(starting_x, starting_y, char_as_string)
+# c.save()
 
 # letter_information_tuples = []
 # for i in range(1, 61):
@@ -222,10 +330,10 @@ def get_letter_information_lists(filename):
         prediction = predictions[index]
         component_x_coordinate = component.x
         component_y_coordinate = component.y+component.height
-        letter_information_list = [numbers_to_labels[prediction], (component_x_coordinate, component_y_coordinate), component.height]
+        letter_information_list = [numbers_to_labels[prediction], (component_x_coordinate, component_y_coordinate), component.height, component.width]
         letter_information_lists.append(letter_information_list)
     return letter_information_lists
 
 # draw_letters_to_pdf(letter_information_lists, file_name)
-letter_information_lists = get_letter_information_lists(file_name)
-draw_letters_to_pdf(letter_information_lists, file_name)
+# letter_information_lists = get_letter_information_lists(file_name)
+# draw_letters_to_pdf(letter_information_lists, file_name)

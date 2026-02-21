@@ -1,5 +1,6 @@
 import cv2
 import numpy
+import math
 
 
 def resize_to_28_x_28(numpy_array):
@@ -15,6 +16,21 @@ def resize_to_28_x_28(numpy_array):
     y_remaninder_padding = (28-new_component_height) % 2
     padded = numpy.pad(resized, ((y_padding, y_padding+y_remaninder_padding), (x_padding, x_padding+x_remainder_padding)), mode='constant', constant_values=0)
     return padded
+
+def get_percentages_from_forward_pass(forward_pass_scores):
+    max_score = numpy.max(forward_pass_scores)
+    shifted = forward_pass_scores-max_score
+    exp_scores = []
+    for class_score in shifted:
+        exp_score = math.e**class_score
+        exp_scores.append(exp_score)
+    sum_of_exps = sum(exp_scores)
+    percentage_chances = []
+    for exp in exp_scores:
+        percentage_chance = exp/sum_of_exps
+        percentage_chances.append(percentage_chance)
+    return percentage_chances
+
 
 def binarise_image(image, threshold):
     height, width = image.shape

@@ -27,20 +27,6 @@ def copy_new_scans():
 
 def binarise_scan(source_png, file_name):
     grayscale_image = cv2.imread(source_png, 2)  #reads the image as a grayscale
-    # blurred = cv2.GaussianBlur(grayscale_image, (101, 101), 0)
-    # normalised = cv2.divide(grayscale_image, blurred, scale=255)
-    # _, heavily_binarised = cv2.threshold(normalised, 254, 255, cv2.THRESH_BINARY)
-    # blurred = cv2.GaussianBlur(grayscale_image, (21, 21), 0)
-    # normalised = cv2.divide(grayscale_image, blurred, scale=255)
-    # _, weakly_binarised = cv2.threshold(normalised, 239, 255, cv2.THRESH_BINARY)
-    # heavily_binarised = cv2.adaptiveThreshold(
-    #     grayscale_image,
-    #     255,
-    #     cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-    #     cv2.THRESH_BINARY,
-    #     blockSize=15,
-    #     C=3
-    #
 
     heavily_binarised = cv2.adaptiveThreshold(
         grayscale_image, 255,
@@ -54,8 +40,8 @@ def binarise_scan(source_png, file_name):
         grayscale_image, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        blockSize=21,
-        C=5
+        blockSize=99,
+        C=10
     )
 
     heavily_binarised= cv2.bitwise_not(heavily_binarised)
@@ -65,20 +51,21 @@ def binarise_scan(source_png, file_name):
     return heavily_binarised, weakly_binarised, file_name
 
 
-def save_numpys():
+def save_numpys(paper_type):
     for file_name in os.listdir(images_pulled):
         if file_name not in os.listdir(images_weakly_binarised):
             file_name_no_stem = file_name[:-4]
             source_png = os.path.join(images_pulled, file_name)
             heavily_binarised, weakly_binarised, file_name = binarise_scan(source_png, file_name)
-            lines_removed, file_name = remove_lines(heavily_binarised, weakly_binarised, file_name)
+            lines_removed, file_name = remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type)
+
             dest_file_for_png = os.path.join(images_lines_removed, file_name_no_stem)
             kernel = numpy.ones((2, 2), numpy.uint8)
             denoised = cv2.morphologyEx(lines_removed, cv2.MORPH_OPEN, kernel, iterations=1)
             cv2.imwrite(dest_file_for_png + ".png", denoised)
 
 
-def remove_lines(heavily_binarised, weakly_binarised, file_name):
+def remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type):
     numpy_file = heavily_binarised
     height, width = numpy_file.shape
     line_starter_pixels = []
@@ -132,8 +119,9 @@ def remove_lines(heavily_binarised, weakly_binarised, file_name):
         all_line_px.add((0, x_value))
         all_line_px.add((height - 1, x_value))
     pixels_to_delete = all_line_px - letter_line_px
-    for pixel in pixels_to_delete:
-        weakly_binarised[pixel] = 0
+    if paper_type == "lined":
+        for pixel in pixels_to_delete:
+            weakly_binarised[pixel] = 0
         # pass
     return weakly_binarised, file_name
 
@@ -274,7 +262,7 @@ def search_for_letters(line, numpy_file):
     pixels_to_check_lower = strip_to_check_lower + arrow_to_check_lower
     lower_foreground_px = 0
     for pixel in pixels_to_check_lower:
-        if numpy_file[pixel] == 255:
+        if numpy_file[pixel] == 255 and "lined":
             lower_foreground_px = lower_foreground_px + 1
             split_letter_px.append(pixel)
 
@@ -298,7 +286,7 @@ def get_skeletons(file_name):
         skeleton_list.append(skeleton)
 
     return components, skeleton_list
-copy_new_scans()
-save_numpys()
+# copy_new_scans()
+# save_numpys()
 # get_skeletons("gold standard scan")
 
