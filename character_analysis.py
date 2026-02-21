@@ -873,7 +873,9 @@ class Classification_Model_NEW:
         time_before_accuracy_check = time.time()
         correct_counter = 0
         confusable_correct_counter = 0
-
+        accuracies = {}
+        for id, character in numbers_to_labels.items():
+            accuracies[character] = [0, 0, 0.0]
         total_images = 97500
         maths_per_big_batch = 1500
         EMNIST_per_big_batch = 5000
@@ -897,9 +899,24 @@ class Classification_Model_NEW:
                 for prediction_index in range(0, 130):
                     prediction = predictions[prediction_index]
                     label = labels[prediction_index]
+                    label_as_chr = numbers_to_labels[label]
+                    old_values = accuracies[label_as_chr]
+                    total_appearances = old_values[0]
+                    total_correct = old_values[1]
                     if prediction == label:
                         correct_counter = correct_counter + 1
-
+                        new_total_correct_per_char = total_correct + 1
+                        new_total_appearances_per_char = total_appearances + 1
+                        new_accuracy_per_char = 100 * round(new_total_correct_per_char / new_total_appearances_per_char, 3)
+                        new_values = [new_total_appearances_per_char, new_total_correct_per_char, new_accuracy_per_char]
+                        accuracies[label_as_chr] = new_values
+                    else:
+                        new_total_correct_per_char = total_correct
+                        new_total_appearances_per_char = total_appearances + 1
+                        new_accuracy_per_char = 100 * round(new_total_correct_per_char / new_total_appearances_per_char,
+                                                            3)
+                        new_values = [new_total_appearances_per_char, new_total_correct_per_char, new_accuracy_per_char]
+                        accuracies[label_as_chr] = new_values
                     prediction_as_letter = numbers_to_labels[prediction]
                     label_as_letter = numbers_to_labels[label]
                     possible_confusables = get_similar_letters(prediction_as_letter)
@@ -909,6 +926,7 @@ class Classification_Model_NEW:
         time_after_accuracy_check = time.time()
         time_for_accuracy_check = time_after_accuracy_check - time_before_accuracy_check
         print("Accuracy check", round(time_for_accuracy_check, 3))
+        print(accuracies)
         return round((correct_counter / total_images * 100), 3), round((confusable_correct_counter / total_images * 100), 3)
 
 
