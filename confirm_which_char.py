@@ -176,12 +176,96 @@ labels_to_numbers = {
     '{': 82,
     '}': 83
 }
-
-
-
-def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a=0.75, threshold_b=0.01, check_for_confusables=True):
+default = 0.75
+thresholds = {
+    0: default,
+    1: default,
+    2: default,
+    3: default,
+    4: default,
+    5: default,
+    6: default,
+    7: default,
+    8: default,
+    9: default,
+    10: default,
+    11: default,
+    12: default,
+    13: default,
+    14: default,
+    15: default,
+    16: default,
+    17: default,
+    18: default,
+    19: default,
+    20: default,
+    21: default,
+    22: default,
+    23: default,
+    24: default,
+    25: default,
+    26: default,
+    27: default,
+    28: default,
+    29: default,
+    30: default,
+    31: default,
+    32: default,
+    33: default,
+    34: default,
+    35: default,
+    36: default,
+    37: default,
+    38: default,
+    39: default,
+    40: default,
+    41: default,
+    42: default,
+    43: default,
+    44: default,
+    45: default,
+    46: 1,  # t
+    47: default,
+    48: default,
+    49: default,
+    50: 1,  # +
+    51: default,
+    52: default,
+    53: default,
+    54: default,
+    55: default,
+    56: default,
+    57: default,
+    58: default,
+    59: default,
+    60: default,
+    61: default,
+    62: default,
+    63: default,
+    64: default,
+    65: default,
+    66: default,
+    67: default,
+    68: default,
+    69: default,
+    70: default,
+    71: default,
+    72: default,
+    73: default,
+    74: default,
+    75: default,
+    76: default,
+    77: default,
+    78: default,
+    79: default,
+    80: default,
+    81: default,
+    82: default,
+    83: default
+}
+def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a = default, threshold_b=0.005, check_for_confusables=True):
     percentage_chances = get_percentages_from_forward_pass(forward_pass_scores)
-    if numpy.max(percentage_chances) > threshold_a:
+    if numpy.max(percentage_chances) > thresholds[numpy.argmax(percentage_chances)]:
         return [numpy.argmax(percentage_chances)], percentage_chances
     else:
         potential_letters = []
@@ -197,7 +281,7 @@ def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a
             confusable_letters_set = set(confusable_letters_for_letter)
             # print(potential_letters_set, confusable_letters_set)
             if potential_letters_set.issubset(confusable_letters_set):
-                return [numpy.argmax(percentage_chances), percentage_chances]
+                return [numpy.argmax(percentage_chances)], percentage_chances
             else:
                 return potential_letters, percentage_chances
         else:
@@ -226,7 +310,7 @@ def get_user_input(numpy_array, potential_letters, percentage_chances):
         certainties.sort(reverse=True)
         for index in range(0, min(len(certainties), 10)):
             percentage, class_num, label = certainties[index]
-            if percentage > 0.01:
+            if percentage > 0.005:
                 print(f"{index + 1}. {label} : {round(percentage * 100, 2)}%")
         print("\n" * 3)
 

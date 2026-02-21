@@ -1015,7 +1015,6 @@ def full_classification_pipeline(list_of_npy_arrays):
     classifier = Classification_Model_NEW(hyperparam_set)
     classifier.load_parameters()
     predictions = []
-    images, labels = get_EMNIST_images(0, 100, "testing")
     for index in range(0, len(list_of_npy_arrays)):
         array = list_of_npy_arrays[index]
         # print(array)
@@ -1031,6 +1030,6 @@ hyperparam_set = get_random_hyperparams()
 classifier = Classification_Model_NEW(hyperparam_set)
 # classifier.train()
 # # classifier.validation_accuracy_check()
-classifier.load_parameters()
-print(classifier.testing_accuracy_check())
+# classifier.load_parameters()
+# print(classifier.testing_accuracy_check())
 # print(classifier.per_character_accuracy_check())
