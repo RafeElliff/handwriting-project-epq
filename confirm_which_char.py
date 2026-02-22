@@ -182,12 +182,12 @@ thresholds = {
     1: default,
     2: default,
     3: default,
-    4: default,
+    4: 0.95,  # 4
     5: default,
     6: default,
     7: default,
-    8: default,
-    9: default,
+    8: 0.95,  # 8
+    9: 0.95,  # 9
     10: default,
     11: default,
     12: default,
@@ -196,22 +196,22 @@ thresholds = {
     15: default,
     16: default,
     17: default,
-    18: default,
-    19: default,
-    20: default,
+    18: 0.95,  # I
+    19: 0.95,  # J
+    20: 0.95,  # K
     21: default,
     22: default,
     23: default,
     24: default,
-    25: default,
+    25: 0.95,  # P
     26: default,
     27: default,
     28: default,
     29: default,
-    30: default,
+    30: 0.95,  # U
     31: default,
     32: default,
-    33: default,
+    33: 0.95,  # X
     34: default,
     35: default,
     36: default,
@@ -219,16 +219,16 @@ thresholds = {
     38: default,
     39: default,
     40: default,
-    41: default,
+    41: 0.95,  # g
     42: default,
     43: default,
-    44: default,
+    44: 0.95,  # q
     45: default,
-    46: 1,  # t
+    46: 0.95,  # t
     47: default,
-    48: default,
-    49: default,
-    50: 1,  # +
+    48: 0.95,  # (
+    49: 0.95,  # )
+    50: 0.95,  # '+'
     51: default,
     52: default,
     53: default,
@@ -266,6 +266,7 @@ thresholds = {
 def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a = default, threshold_b=0.005, check_for_confusables=True):
     percentage_chances = get_percentages_from_forward_pass(forward_pass_scores)
     if numpy.max(percentage_chances) > thresholds[numpy.argmax(percentage_chances)]:
+    # if numpy.max(percentage_chances) > default:
         return [numpy.argmax(percentage_chances)], percentage_chances
     else:
         potential_letters = []

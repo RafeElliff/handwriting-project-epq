@@ -6,7 +6,7 @@ from segment_scans import full_segmentation_pipeline
 from character_analysis import full_classification_pipeline
 import numpy
 from prepare_scans import get_skeletons
-base_pdf_folder= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\final_pdfs"
+base_pdf_folder= r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\pdf_intermediate"
 images_prepared_base_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_lines_removed"
 
 labels_to_numbers = {

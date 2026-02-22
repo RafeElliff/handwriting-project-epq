@@ -4,6 +4,7 @@ import cv2
 import numpy
 from segment_scans import full_segmentation_pipeline
 from helper_functions import get_npy_images, view_numpy_as_png
+import img2pdf
 
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
 images_pulled = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_pulled"
@@ -12,6 +13,7 @@ images_weakly_binarised= r"C:\Users\rafee\PycharmProjects\handwriting-project-ep
 list_of_split_px_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\list_of_split_px"
 images_lines_removed = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_lines_removed"
 images_morphs_applied = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_morphs_applied"
+intermediate_pdfs = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\pdf_intermediate"
 def copy_new_scans():
     for file_name in os.listdir(onedrive_source):  #loops through name of every file
         if file_name[-4:] == ".pdf":
@@ -53,16 +55,26 @@ def binarise_scan(source_png, file_name):
 
 def save_numpys(paper_type):
     for file_name in os.listdir(images_pulled):
+        if file_name[0] == "x" or file_name[0] == "X":
+            filepath = os.path.join(images_pulled, file_name)
+            doc = fitz.open()
+            page = doc.new_page()
+            pdf_filename = file_name[1:-4] + ".pdf"
+            page.insert_image(page.rect, filename=filepath)
+            doc.save(os.path.join(intermediate_pdfs, pdf_filename))
+            doc.close()
+
+            continue
         if file_name not in os.listdir(images_weakly_binarised):
             file_name_no_stem = file_name[:-4]
             source_png = os.path.join(images_pulled, file_name)
             heavily_binarised, weakly_binarised, file_name = binarise_scan(source_png, file_name)
             lines_removed, file_name = remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type)
-
             dest_file_for_png = os.path.join(images_lines_removed, file_name_no_stem)
             kernel = numpy.ones((2, 2), numpy.uint8)
             denoised = cv2.morphologyEx(lines_removed, cv2.MORPH_OPEN, kernel, iterations=1)
             cv2.imwrite(dest_file_for_png + ".png", denoised)
+
 
 
 def remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type):
