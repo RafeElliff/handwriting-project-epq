@@ -3,7 +3,9 @@ import fitz
 import cv2
 import numpy
 from segment_scans import full_segmentation_pipeline
+import time
 from helper_functions import get_npy_images, view_numpy_as_png
+from check_processed_images import check_if_image_processed, mark_image_as_processed
 import img2pdf
 
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
@@ -14,12 +16,27 @@ list_of_split_px_folder = r"C:\Users\rafee\PycharmProjects\handwriting-project-e
 images_lines_removed = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_lines_removed"
 images_morphs_applied = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_morphs_applied"
 intermediate_pdfs = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\pdf_intermediate"
+
+def rename_file(filename):
+    other_two_prefixes = filename[:2]
+    important_prefix = filename[2]
+    filename_no_prefixes = filename[3:]
+    if important_prefix == "t" or important_prefix == "T":
+        filename_new = other_two_prefixes + filename_no_prefixes
+    else:
+        filename_new = other_two_prefixes + time.ctime().replace(":", "-")
+    return filename_new
+
 def copy_new_scans():
     for file_name in os.listdir(onedrive_source):  #loops through name of every file
         if file_name[-4:] == ".pdf":
             file_to_copy = os.path.join(onedrive_source, file_name)  #accesses the file with file_name
-            dest_file = os.path.join(images_pulled, file_name[:-4] + ".png")
-            if file_name[:-4] + ".png" not in os.listdir(images_pulled):  #checks that it hasn't already been copied
+            #renamed file will have format"xct..." where x, c, and t are the important chars.
+            dest_file = os.path.join(images_pulled, rename_file(file_name)[:-4] + ".png")
+            #As a result, files in images pulled will have format "xc..." where x and c are the important chars
+            file_processed = check_if_image_processed(file_name)
+            if not file_processed:  #checks that it hasn't already been copied
+                mark_image_as_processed(file_name)
                 pdf = fitz.open(file_to_copy)
                 page = pdf[0]
                 pix = page.get_pixmap(dpi=300)
@@ -59,7 +76,7 @@ def save_numpys(paper_type):
             filepath = os.path.join(images_pulled, file_name)
             doc = fitz.open()
             page = doc.new_page()
-            pdf_filename = file_name[1:-4] + ".pdf"
+            pdf_filename = file_name[:-4] + ".pdf"
             page.insert_image(page.rect, filename=filepath)
             doc.save(os.path.join(intermediate_pdfs, pdf_filename))
             doc.close()
