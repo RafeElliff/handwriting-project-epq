@@ -176,8 +176,8 @@ labels_to_numbers = {
     '{': 82,
     '}': 83
 }
-default = 0.75
-thresholds = {
+default = 0.75 #This should be adjusted depending on your desired ratios of manual input required and accuracy
+thresholds = { #This dictionary can be customised as you want, depending on what problems you tend to encounter.
     0: default,
     1: default,
     2: default,
@@ -263,42 +263,38 @@ thresholds = {
     82: default,
     83: default
 }
+
 def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a = default, threshold_b=0.005, check_for_confusables=True):
     percentage_chances = get_percentages_from_forward_pass(forward_pass_scores)
-    if numpy.max(percentage_chances) > thresholds[numpy.argmax(percentage_chances)]:
-    # if numpy.max(percentage_chances) > default:
+    if numpy.max(percentage_chances) > thresholds[numpy.argmax(percentage_chances)]: #If certain enough, immediately return the letter
         return [numpy.argmax(percentage_chances)], percentage_chances
     else:
         potential_letters = []
         for index in range(len(percentage_chances)):
             class_percentage = percentage_chances[index]
-            # print(class_percentage)
             if class_percentage > threshold_b:
-                potential_letters.append(numbers_to_labels[index]) #Possible that using a system based on n highest scorers works better - need to test
-        if check_for_confusables is True:
+                potential_letters.append(numbers_to_labels[index]) #If reaches a certain likelihood threshold, make it a possibility
+        if check_for_confusables is True: #I recommend leaving this on, otherwise it will show trivial cases e.g. between an O and a 0
             first_letter = potential_letters[0]
             potential_letters_set = set(potential_letters)
-            confusable_letters_for_letter = get_similar_letters(first_letter)
+            confusable_letters_for_letter = get_similar_letters(first_letter) #Sees which letters are similar and could cause confusion
             confusable_letters_set = set(confusable_letters_for_letter)
-            # print(potential_letters_set, confusable_letters_set)
             if potential_letters_set.issubset(confusable_letters_set):
-                return [numpy.argmax(percentage_chances)], percentage_chances
+                return [numpy.argmax(percentage_chances)], percentage_chances #Returns whichever letter is most likely out of the subset
             else:
-                return potential_letters, percentage_chances
+                return potential_letters, percentage_chances #Returns all possibilities that exceed threshold_b, along with their certainties
         else:
             return potential_letters, percentage_chances
 
-
-
-
 def get_user_input(numpy_array, potential_letters, percentage_chances):
+    #This function shows an image to a user and asks them for their opinion on what letter it is
     image_scaled_up = (numpy_array * 255).astype(numpy.uint8)
     image_for_display = image_scaled_up[0, :, :, 0]
     if len(potential_letters) == 1:
-        return potential_letters[0]
+        return potential_letters[0] #If only one option, immediately use that option without showing it.
     else:
         sorted_letters = []
-        for letter in potential_letters:
+        for letter in potential_letters: #Otherwise, get all the letters
             letter_index = labels_to_numbers[letter]
             percentage = percentage_chances[letter_index]
             sorted_letters.append((percentage, letter))
@@ -308,18 +304,18 @@ def get_user_input(numpy_array, potential_letters, percentage_chances):
         certainties = []
         for class_num in range(0, len(percentage_chances)):
             certainties.append((percentage_chances[class_num], class_num, numbers_to_labels[class_num]))
-        certainties.sort(reverse=True)
+        certainties.sort(reverse=True) #Sorts them into highest certainty first
         for index in range(0, min(len(certainties), 10)):
             percentage, class_num, label = certainties[index]
-            if percentage > 0.005:
-                print(f"{index + 1}. {label} : {round(percentage * 100, 2)}%")
+            if percentage > 0.005: #This is not 0.005%, rather 0.5%
+                print(f"{index + 1}. {label} : {round(percentage * 100, 2)}%") #Prints all of the options for the user
         print("\n" * 3)
 
         cv2.imshow(str(potential_letters), image_for_display)
         while True:
             key_pressed_id = cv2.waitKey(0)
-            key_pressed_char = int(chr(key_pressed_id))
+            key_pressed_char = int(chr(key_pressed_id)) #This allows the user to press a key straight from the image, rather than typing something into console
             id_for_indexing = key_pressed_char - 1
-            if id_for_indexing < len(potential_letters):
+            if id_for_indexing < len(potential_letters): #Waits until a valid number is put in. There is no protection against non-number keys though, it is thought that while it is easy to accidentally press a wrong number, it is much harder to move to a different row of the keyboard and type a letter
                 cv2.destroyAllWindows()
                 return labels_to_numbers[potential_letters[id_for_indexing]]

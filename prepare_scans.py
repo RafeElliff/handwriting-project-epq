@@ -4,9 +4,8 @@ import cv2
 import numpy
 from segment_scans import full_segmentation_pipeline
 import time
-from helper_functions import get_npy_images, view_numpy_as_png
+from helper_functions import get_npy_images
 from check_processed_images import check_if_image_processed, mark_image_as_processed
-import img2pdf
 
 onedrive_source = r'C:\Users\rafee\OneDrive\Scans'
 images_pulled = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_pulled"
@@ -17,7 +16,7 @@ images_lines_removed = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\
 images_morphs_applied = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\images\images_morphs_applied"
 intermediate_pdfs = r"C:\Users\rafee\PycharmProjects\handwriting-project-epq\pdf_intermediate"
 
-def rename_file(filename):
+def rename_file(filename): #This code handles the logic for renaming the 'keyboard smash' files - unless a certain criterion is met, rename the file to have a name related to the time of processing
     other_two_prefixes = filename[:2]
     important_prefix = filename[2]
     filename_no_prefixes = filename[3:]
@@ -31,9 +30,7 @@ def copy_new_scans():
     for file_name in os.listdir(onedrive_source):  #loops through name of every file
         if file_name[-4:] == ".pdf":
             file_to_copy = os.path.join(onedrive_source, file_name)  #accesses the file with file_name
-            #renamed file will have format"xct..." where x, c, and t are the important chars.
             dest_file = os.path.join(images_pulled, rename_file(file_name)[:-4] + ".png")
-            #As a result, files in images pulled will have format "xc..." where x and c are the important chars
             file_processed = check_if_image_processed(file_name)
             if not file_processed:  #checks that it hasn't already been copied
                 mark_image_as_processed(file_name)
@@ -43,10 +40,11 @@ def copy_new_scans():
                 pix.save(dest_file)
                 pdf.close()  #this converts the file to a png and saves it to images_pulled
 
-
 def binarise_scan(source_png, file_name):
     grayscale_image = cv2.imread(source_png, 2)  #reads the image as a grayscale
 
+    #I originally had two separate binary scans ("heavily_binarised" was used for coordinates, whereas "weakly_binarised" was used to get the letters themselves)
+    #When I switched to skeletonisation there was no longer any need to distinguish between them. At a tiny performance hit, I chose not to rewrite my existing code.
     heavily_binarised = cv2.adaptiveThreshold(
         grayscale_image, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -69,10 +67,9 @@ def binarise_scan(source_png, file_name):
     cv2.imwrite(os.path.join(images_weakly_binarised, file_name), weakly_binarised)
     return heavily_binarised, weakly_binarised, file_name
 
-
-def save_numpys(paper_type):
+def save_numpys(paper_type): #This is the function that brings together all of the preprocessing, turning a source png into the various file types in \images
     for file_name in os.listdir(images_pulled):
-        if file_name[0] == "x" or file_name[0] == "X":
+        if file_name[0] == "x" or file_name[0] == "X": #if it has the "no OCR" tag, then saves it directly as a pdf without further processing
             filepath = os.path.join(images_pulled, file_name)
             doc = fitz.open()
             page = doc.new_page()
@@ -80,21 +77,21 @@ def save_numpys(paper_type):
             page.insert_image(page.rect, filename=filepath)
             doc.save(os.path.join(intermediate_pdfs, pdf_filename))
             doc.close()
-
             continue
+
         if file_name not in os.listdir(images_weakly_binarised):
             file_name_no_stem = file_name[:-4]
             source_png = os.path.join(images_pulled, file_name)
-            heavily_binarised, weakly_binarised, file_name = binarise_scan(source_png, file_name)
-            lines_removed, file_name = remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type)
+            heavily_binarised, weakly_binarised, file_name = binarise_scan(source_png, file_name) #Binarises
+            lines_removed, file_name = remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type) #Removes lines
             dest_file_for_png = os.path.join(images_lines_removed, file_name_no_stem)
             kernel = numpy.ones((2, 2), numpy.uint8)
-            denoised = cv2.morphologyEx(lines_removed, cv2.MORPH_OPEN, kernel, iterations=1)
+            denoised = cv2.morphologyEx(lines_removed, cv2.MORPH_OPEN, kernel, iterations=1) #Removes small specks on the paper
             cv2.imwrite(dest_file_for_png + ".png", denoised)
 
-
-
 def remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type):
+    #It's quite hard to explain without a visual aide what this code does. I would refer to the log entries from 29/12/25 and 30/12/25 to understand a bit better what this code does.
+    #It's also worth noting that this code is not flawless. To get consistent results, it is recommended to write on blank, unlined paper.
     numpy_file = heavily_binarised
     height, width = numpy_file.shape
     line_starter_pixels = []
@@ -122,7 +119,7 @@ def remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type):
             existing_lines.append([starter, starter, 0])
 
     list_of_split_px = set()
-    for line in existing_lines:  #I'm going to go back to storing pixels as tuples now. I didn't earlier because their immutability made it impossible with my algorithm, but I believe that tuples are neater
+    for line in existing_lines:
         highest_pixel = (line[0], 0)
         lowest_pixel = (line[1], 0)
         initial_line = [highest_pixel[0], lowest_pixel[0], 0]
@@ -140,7 +137,7 @@ def remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type):
 
     numpy_list_of_split_px = numpy.array(list(list_of_split_px))
     dest_file_npy = os.path.join(list_of_split_px_folder, new_numpy_file_name)
-    numpy.save(dest_file_npy, numpy_list_of_split_px)
+    numpy.save(dest_file_npy, numpy_list_of_split_px) #Writes the list of split pixels to be joined together in segmentation
     for y_value in range(0, height):
         all_line_px.add((y_value, 0))
         all_line_px.add((y_value, width - 1))
@@ -150,10 +147,9 @@ def remove_lines(heavily_binarised, weakly_binarised, file_name, paper_type):
     pixels_to_delete = all_line_px - letter_line_px
     if paper_type == "lined":
         for pixel in pixels_to_delete:
-            weakly_binarised[pixel] = 0
+            weakly_binarised[pixel] = 0 # Deletes pixels which are line pixels
         # pass
     return weakly_binarised, file_name
-
 
 def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest pixel on a line in a column, this finds the highest and lowest pixel in the next column.
     height, width = numpy_file.shape
@@ -168,7 +164,7 @@ def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest p
     lowest_h = (max(line_lowest - 1, 0), line_x + 1)
     lowest_s = (line_lowest, line_x + 1)
     lowest_l = (min(line_lowest + 1, height - 1),
-                line_x + 1)  # there's some unnecessary whitespace in this block, but it keeps the spacing consistent
+                line_x + 1)
     next_highest = None
     next_lowest = None
     if letter_above:
@@ -176,6 +172,8 @@ def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest p
     if letter_below:
         next_lowest = lowest_s
     if not letter_above:
+        # Goes through the 3 most common possibilities, then tackles other possibilities with a loop.
+        #I didn't want to use a loop for all of it as this could lead to unexpected results if there was noise nearby
         if numpy_file[highest_h] == 255:
             next_highest = highest_h
         elif numpy_file[highest_s] == 255:
@@ -223,8 +221,7 @@ def find_next_highest_pixels(line, numpy_file):  #Given the highest and lowest p
     part_of_letter = letter_below or letter_above
     return return_line, part_of_letter, split_letter_px
 
-
-def search_for_letters(line, numpy_file):
+def search_for_letters(line, numpy_file): #This, using combinations of pixels, looks for whether there are letters present above or below a line
     height, width = numpy_file.shape
     highest_pixel_y = line[0]
     highest_pixel_x = line[2]
@@ -233,6 +230,7 @@ def search_for_letters(line, numpy_file):
     letter_above = False
     letter_below = False
     split_letter_px = []
+    #Lists of pixels to check
     strip_to_check_upper = [
         (max(0, highest_pixel_y - 5), max(0, min(width - 6, highest_pixel_x - 6))),
         (max(0, highest_pixel_y - 5), max(0, min(width - 6, highest_pixel_x - 5))),
@@ -257,13 +255,14 @@ def search_for_letters(line, numpy_file):
     ]
     pixels_to_check_upper = strip_to_check_upper + arrow_to_check_upper
     upper_foreground_px = 0
-    for pixel in pixels_to_check_upper:
+    for pixel in pixels_to_check_upper: #Checks if any of the pixels are foreground: a count is kept of how many there are
         if numpy_file[pixel] == 255:
             upper_foreground_px = upper_foreground_px + 1
             split_letter_px.append(pixel)
     if upper_foreground_px > 0:
         letter_above = True
 
+    #The same as the code above but checks below instead
     strip_to_check_lower = [
         (min(height - 1, lowest_pixel_y + 5), max(0, min(width - 6, lowest_pixel_x - 6))),
         (min(height - 1, lowest_pixel_y + 5), max(0, min(width - 6, lowest_pixel_x - 5))),
@@ -290,8 +289,8 @@ def search_for_letters(line, numpy_file):
 
     pixels_to_check_lower = strip_to_check_lower + arrow_to_check_lower
     lower_foreground_px = 0
-    for pixel in pixels_to_check_lower:
-        if numpy_file[pixel] == 255 and "lined":
+    for pixel in pixels_to_check_lower: #
+        if numpy_file[pixel] == 255:
             lower_foreground_px = lower_foreground_px + 1
             split_letter_px.append(pixel)
 
@@ -300,22 +299,15 @@ def search_for_letters(line, numpy_file):
 
     return letter_above, letter_below, split_letter_px
 
-
-
-def get_skeletons(file_name):
+def get_skeletons(file_name): #This file does everything that needs to be done to convert a scan into skeletons
     image_lines_removed = cv2.imread(os.path.join(images_lines_removed, file_name+".png"), 2)
-    image_lines_removed_for_segmentation = image_lines_removed.copy()
-    # print(image_lines_removed.shape)
-    modified_image, original_image, components, file_name = full_segmentation_pipeline(image_lines_removed, image_lines_removed_for_segmentation, file_name)
-    components, resized_list, file_name = get_npy_images(components, file_name, original_image)
-    # print(len(components))
+    image_lines_removed_for_segmentation = image_lines_removed.copy() #Gets the lines removed
+    modified_image, original_image, components, file_name = full_segmentation_pipeline(image_lines_removed, image_lines_removed_for_segmentation, file_name)#Extracts components
+    components, resized_list, file_name = get_npy_images(components, file_name, original_image) #Gets the arrays representing the components
     skeleton_list = []
     for image in resized_list:
         skeleton = cv2.ximgproc.thinning(image)/255
-        skeleton_list.append(skeleton)
+        skeleton_list.append(skeleton) #Gets the skeletons of the components
 
     return components, skeleton_list
-# copy_new_scans()
-# save_numpys()
-# get_skeletons("gold standard scan")
 

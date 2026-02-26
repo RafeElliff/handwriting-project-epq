@@ -181,7 +181,6 @@ numbers_to_labels = {
     82: '{',
     83: '}'
 }
-
 letter_type_to_letter = {
     '0': "0",
     '1': "1",
@@ -269,71 +268,40 @@ letter_type_to_letter = {
     '}': "}"
 }
 
-
 def get_standardised_info(letter_real_height, letter_real_width, letter_real_y):
     line_to_snap_to = round(letter_real_y/30, 0)
-    y_to_snap_to = line_to_snap_to * 30
-    # if letter_real_height < 20 and letter_real_width < 20:
-    #     font_size = 50
-    # else:
-    #     font_size = 100
+    y_to_snap_to = line_to_snap_to * 30 #These two lines find the nearest y line to snap to
     average_proportion = max(letter_real_height, letter_real_width)
-    font_size = int(average_proportion / 0.7)
+    font_size = int(average_proportion / 0.7) #This determines the font size based off whichever dimension of the letter is largest
     return y_to_snap_to, font_size
-#
-# c = canvas.Canvas(base_pdf_folder+"\\final_pdf.pdf", pagesize=(original_page_width,original_page_height))
-# c.setFont("Times-Roman", 20)
-# c.drawString(0, original_page_height-20, "Hello World")
-file_name = "maths"
+
 def draw_letters_to_pdf(letter_information_lists, file_name):
     images_prepared_filepath = os.path.join(images_prepared_base_folder, file_name+".png")
     original_page_height, original_page_width = cv2.imread(images_prepared_filepath, 2).shape
-    print(original_page_height, original_page_width)
-    c = canvas.Canvas(os.path.join(base_pdf_folder, file_name+".pdf"), pagesize=(original_page_width, original_page_height))
+    c = canvas.Canvas(os.path.join(base_pdf_folder, file_name+".pdf"), pagesize=(original_page_width, original_page_height)) #Initialises a new pdf as the 'canvas'
     for letter in letter_information_lists:
         letter_type = letter[0]
         letter_bottom_left = letter[1]
-        letter_real_y = original_page_height - letter_bottom_left[1]
+        letter_real_y = original_page_height - letter_bottom_left[1] #these pdfs count y from the bottom up, so you need to inverse it to get 'real' height
         letter_real_height = letter[2]
         letter_real_width = letter[3]
-        y_to_snap_to, letter_font_size = get_standardised_info(letter_real_height, letter_real_width, letter_real_y)
+        y_to_snap_to, letter_font_size = get_standardised_info(letter_real_height, letter_real_width, letter_real_y) #Gets the y value and font size correct
         c.setFont("Times-Roman", letter_font_size)
         if letter_type == "-":
             letter_font_size = letter_font_size * 2
-        c.drawString(letter_bottom_left[0], y_to_snap_to, letter_type_to_letter[str(letter_type)])
-    c.save()
-
-
-# c = canvas.Canvas(os.path.join(base_pdf_folder, "testing"+".pdf"), pagesize=(2000, 3000))
-# starting_x = 0
-# starting_y = 0
-# for character_type, char_as_string in letter_type_to_letter.items():
-#     starting_y = starting_y + 30
-#     starting_x = starting_x + 20
-#     c.setFont("Times-Roman", 50)
-#     c.drawString(starting_x, starting_y, char_as_string)
-# c.save()
-
-# letter_information_tuples = []
-# for i in range(1, 61):
-#     y_coordinate = 40*i
-#     letter = ['a', (70, y_coordinate), 40]
-#     letter_information_tuples.append(letter)
+        c.drawString(letter_bottom_left[0], y_to_snap_to, letter_type_to_letter[str(letter_type)]) #Draws the letter with the y value and font calculated in the above function
+    c.save() #c.save is always necessary as the functions work on a shadow copy of the pdf so without this the changes will not be visble
 
 def get_letter_information_lists(filename):
     components, normalised_skeletons = get_skeletons(filename)
-    numpy_skeletons = numpy.array(normalised_skeletons)
-    predictions = full_classification_pipeline(numpy_skeletons)
+    numpy_skeletons = numpy.array(normalised_skeletons) #This gets the skeletons of the characters in an image
+    predictions = full_classification_pipeline(numpy_skeletons) #Gets the prediction per letter, including user input where applicable
     letter_information_lists = []
-    for index in range(0, len(components)):
+    for index in range(0, len(components)): #For each component, it accesses the prediction associated with that component, along with its coordinates, for use in the drawing function
         component = components[index]
         prediction = predictions[index]
         component_x_coordinate = component.x
         component_y_coordinate = component.y+component.height
         letter_information_list = [numbers_to_labels[prediction], (component_x_coordinate, component_y_coordinate), component.height, component.width]
         letter_information_lists.append(letter_information_list)
-    return letter_information_lists
-
-# draw_letters_to_pdf(letter_information_lists, file_name)
-# letter_information_lists = get_letter_information_lists(file_name)
-# draw_letters_to_pdf(letter_information_lists, file_name)
+    return letter_information_lists #Returns a whole list of characters to draw and coordinates to (be processed into coordinates to) draw them at
