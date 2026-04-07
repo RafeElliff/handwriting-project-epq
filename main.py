@@ -13,6 +13,7 @@ for png_filename in os.listdir(images_pulled):
     filename_no_ext = png_filename[:-4]
     pdf_filename = filename_no_ext + ".pdf"
     if pdf_filename not in os.listdir(pdf_intermediates):
+        print(pdf_filename)
         if pdf_filename[0] != "x" and pdf_filename != "X": #Does not run OCR if it is a file that is tagged as such
             letter_information_lists = get_letter_information_lists(filename_no_ext) #Gets information of what letters to draw
             draw_letters_to_pdf(letter_information_lists, filename_no_ext) # Draws letters

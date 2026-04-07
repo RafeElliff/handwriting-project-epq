@@ -97,7 +97,8 @@ labels_to_numbers = {
     'theta': 80,
     'times': 81,
     '{': 82,
-    '}': 83
+    '}': 83,
+    "space": 84
 }
 numbers_to_labels = {
     0: '0',
@@ -183,7 +184,8 @@ numbers_to_labels = {
     80: 'theta',
     81: 'times',
     82: '{',
-    83: '}'
+    83: '}',
+    84: "space"
 }
 
 #README: it will be difficult to understand what is going on here if you are not already familiar with the project or other, similar projects
@@ -977,3 +979,13 @@ def full_classification_pipeline(list_of_npy_arrays):
         prediction = classifier.get_prediction(array)
         predictions.append(prediction)
     return predictions
+
+
+
+def write_hyperparam_list(number_of_sets):
+    hyperparam_sets = []
+    for set in range (0, number_of_sets):
+        hyperparam_set = get_random_hyperparams()
+        hyperparam_sets.append(hyperparam_set)
+    with open(os.path.join(base_training_data, "hyperparams.json"), "w") as file:
+        json.dump(hyperparam_sets, file)

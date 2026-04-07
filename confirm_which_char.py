@@ -88,7 +88,8 @@ numbers_to_labels = {
     80: 'theta',
     81: 'times',
     82: '{',
-    83: '}'
+    83: '}',
+    84: "space"
 }
 labels_to_numbers = {
     '0': 0,
@@ -174,14 +175,15 @@ labels_to_numbers = {
     'theta': 80,
     'times': 81,
     '{': 82,
-    '}': 83
+    '}': 83,
+    "space": 84
 }
 default = 0.75 #This should be adjusted depending on your desired ratios of manual input required and accuracy
 thresholds = { #This dictionary can be customised as you want, depending on what problems you tend to encounter.
     0: default,
     1: default,
     2: default,
-    3: default,
+    3: 0.95,  # 3
     4: 0.95,  # 4
     5: default,
     6: default,
@@ -212,7 +214,7 @@ thresholds = { #This dictionary can be customised as you want, depending on what
     31: default,
     32: default,
     33: 0.95,  # X
-    34: default,
+    34: 0.75,  # Y
     35: default,
     36: default,
     37: default,
@@ -261,7 +263,8 @@ thresholds = { #This dictionary can be customised as you want, depending on what
     80: default,
     81: default,
     82: default,
-    83: default
+    83: default,
+    84: default
 }
 
 def get_letter_possibilites(forward_pass_scores, percentage_chances, threshold_a = default, threshold_b=0.005, check_for_confusables=True):
@@ -314,8 +317,13 @@ def get_user_input(numpy_array, potential_letters, percentage_chances):
         cv2.imshow(str(potential_letters), image_for_display)
         while True:
             key_pressed_id = cv2.waitKey(0)
+            if key_pressed_id == 8:
+                cv2.destroyAllWindows()
+                print("chose to discard component")
+                return 84
             key_pressed_char = int(chr(key_pressed_id)) #This allows the user to press a key straight from the image, rather than typing something into console
             id_for_indexing = key_pressed_char - 1
             if id_for_indexing < len(potential_letters): #Waits until a valid number is put in. There is no protection against non-number keys though, it is thought that while it is easy to accidentally press a wrong number, it is much harder to move to a different row of the keyboard and type a letter
                 cv2.destroyAllWindows()
+                print("chose option", id_for_indexing+1, ":", potential_letters[id_for_indexing])
                 return labels_to_numbers[potential_letters[id_for_indexing]]

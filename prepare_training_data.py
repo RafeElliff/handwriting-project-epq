@@ -94,7 +94,8 @@ labels_to_numbers = {
     'theta': 80,
     'times': 81,
     '{': 82,
-    '}': 83
+    '}': 83,
+    "space": 84
 }
 numbers_to_labels = {
     0: '0',
@@ -180,7 +181,8 @@ numbers_to_labels = {
     80: 'theta',
     81: 'times',
     82: '{',
-    83: '}'
+    83: '}',
+    84: "space"
 }
 
 #README: this code should not be run. It is a single use block of code that was used to convert the raw maths images into a format that I can work with

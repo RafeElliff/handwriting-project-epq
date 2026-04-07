@@ -93,7 +93,8 @@ labels_to_numbers = {
     'theta': 80,
     'times': 81,
     '{': 82,
-    '}': 83
+    '}': 83,
+    "space": 84
 }
 numbers_to_labels = {
     0: '0',
@@ -179,7 +180,8 @@ numbers_to_labels = {
     80: 'theta',
     81: 'times',
     82: '{',
-    83: '}'
+    83: '}',
+    84: "space"
 }
 letter_type_to_letter = {
     '0': "0",
@@ -265,7 +267,8 @@ letter_type_to_letter = {
     'theta': "θ",
     'times': "×",
     '{': "{",
-    '}': "}"
+    '}': "}",
+    "space": " "
 }
 
 def get_standardised_info(letter_real_height, letter_real_width, letter_real_y):
